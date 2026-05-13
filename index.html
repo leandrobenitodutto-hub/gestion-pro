@@ -1,3 +1,9 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GestiónPro — Control Financiero</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -365,6 +371,10 @@
         <span class="nav-text">Cheques</span>
         <span class="nav-badge" id="badge-cheques" style="display:none">0</span>
       </div>
+      <div class="nav-item" onclick="navigate('transferencias');closeMobileMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7,16 3,12 7,8"/><polyline points="17,8 21,12 17,16"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
+        <span class="nav-text">Transferencias</span>
+      </div>
     </div>
 
     <div class="nav-section">
@@ -581,6 +591,40 @@
                 </tr>
               </thead>
               <tbody id="tabla-gastos"><tr><td colspan="9"><div class="empty"><div class="empty-icon">↓</div><p>Sin gastos registrados</p></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================== TRANSFERENCIAS =================== -->
+      <div class="page" id="page-transferencias">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Transferencias</div>
+            <div class="section-sub">Movimientos entre Caja y Banco — neutros, no afectan el resultado</div>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('modal-transferencia')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nueva Transferencia
+          </button>
+        </div>
+        <div class="grid-2" style="margin-bottom:20px">
+          <div class="stat-card">
+            <div class="stat-accent" style="background:var(--green)"></div>
+            <div class="stat-label">Efectivo → Banco (depósitos)</div>
+            <div class="stat-value" id="trans-ef-banco">$0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-accent" style="background:var(--blue)"></div>
+            <div class="stat-label">Banco → Efectivo (extracciones)</div>
+            <div class="stat-value" id="trans-banco-ef">$0</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th class="hide-mobile">Local</th><th class="mono">Monto</th><th></th></tr></thead>
+              <tbody id="tabla-transferencias"><tr><td colspan="6"><div class="empty"><div class="empty-icon">⇄</div><p>Sin transferencias registradas</p></div></td></tr></tbody>
             </table>
           </div>
         </div>
@@ -966,6 +1010,46 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-gasto')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveGasto()">Guardar Gasto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL TRANSFERENCIA -->
+<div class="modal-overlay" id="modal-transferencia" style="display:none">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3 id="trans-modal-title">Nueva Transferencia</h3>
+      <button class="btn-icon" onclick="closeModal('modal-transferencia')">✕</button>
+    </div>
+    <input type="hidden" id="trans-id">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="trans-fecha">
+      </div>
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="trans-tipo">
+          <option value="ef-banco">💵→🏦 Efectivo a Banco</option>
+          <option value="banco-ef">🏦→💵 Banco a Efectivo</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Monto</label>
+        <input type="number" id="trans-monto" placeholder="0.00" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>Local</label>
+        <select id="trans-local"></select>
+      </div>
+      <div class="form-group full">
+        <label>Descripción</label>
+        <input type="text" id="trans-desc" placeholder="Ej: Depósito para pago Coca Cola...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-transferencia')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveTransferencia()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1553,6 +1637,7 @@ let state = {
   obligaciones: [],
   cajas: [],
   oblAjustes: [],
+  transferencias: [],
 };
 
 // ========================= FLUJO TOGGLE =========================
@@ -1666,6 +1751,7 @@ function navigate(page) {
     dashboard: 'Dashboard', ingresos: 'Ingresos', gastos: 'Gastos',
     cheques: 'Cheques', obligaciones: 'Obligaciones', cajas: 'Caja de Locales',
     flujo: 'Flujo de Fondos', proveedores: 'Proveedores', clientes: 'Clientes',
+    transferencias: 'Transferencias',
     locales: 'Mis Locales', categorias: 'Categorías'
   };
   document.getElementById('topbar-title').textContent = titles[page] || page;
@@ -1679,6 +1765,7 @@ function renderPage(page) {
     ingresos: () => renderMovimientos('ingresos'),
     gastos: () => renderMovimientos('gastos'),
     cheques: renderCheques,
+    transferencias: renderTransferencias,
     obligaciones: renderObligaciones,
     cajas: renderCajas,
     flujo: renderFlujo,
@@ -1727,6 +1814,12 @@ function calcSaldos() {
   state.cajas.forEach(c => {
     caja  += parseFloat(c.totalEf||0);
     banco += parseFloat(c.banco||0);
+  });
+  // Transferencias (neutras en resultado, mueven entre caja y banco)
+  state.transferencias.forEach(t => {
+    const m = parseFloat(t.monto||0);
+    if (t.tipo === 'ef-banco') { caja -= m; banco += m; }
+    else { banco -= m; caja += m; }
   });
   return { caja, banco };
 }
@@ -1811,7 +1904,72 @@ function renderDashboard() {
   document.getElementById('badge-oblig').style.display = oblPend ? 'inline' : 'none';
 }
 
-// ========================= MOVIMIENTOS =========================
+// ========================= TRANSFERENCIAS =========================
+function renderTransferencias() {
+  const tbody = document.getElementById('tabla-transferencias');
+  if (!tbody) return;
+  const sorted = [...state.transferencias].sort((a,b)=>b.fecha>a.fecha?1:-1);
+
+  // Stats
+  const efBanco   = state.transferencias.filter(t=>t.tipo==='ef-banco').reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const bancoEf   = state.transferencias.filter(t=>t.tipo==='banco-ef').reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const el1 = document.getElementById('trans-ef-banco');
+  const el2 = document.getElementById('trans-banco-ef');
+  if (el1) el1.textContent = fmt(efBanco);
+  if (el2) el2.textContent = fmt(bancoEf);
+
+  if (!sorted.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">⇄</div><p>Sin transferencias registradas</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sorted.map(t=>`<tr>
+    <td>${fmtDate(t.fecha)}</td>
+    <td>${t.tipo==='ef-banco'
+      ? '<span class="tag-efectivo">💵→🏦 Ef a Banco</span>'
+      : '<span class="tag-banco">🏦→💵 Banco a Ef</span>'}</td>
+    <td>${t.desc||'-'}</td>
+    <td class="hide-mobile">${getLocalNombre(t.localId)}</td>
+    <td class="mono" style="font-weight:600">${fmt(t.monto)}</td>
+    <td style="display:flex;gap:4px">
+      <button class="btn btn-icon btn-sm" onclick="editarTransferencia('${t.id}')">✏</button>
+      <button class="btn btn-icon btn-sm" onclick="del('transferencias','${t.id}');renderTransferencias();updateTopbar()">🗑</button>
+    </td>
+  </tr>`).join('');
+}
+
+function saveTransferencia() {
+  const editId = document.getElementById('trans-id').value;
+  const data = {
+    fecha:   document.getElementById('trans-fecha').value,
+    tipo:    document.getElementById('trans-tipo').value,
+    monto:   document.getElementById('trans-monto').value,
+    localId: document.getElementById('trans-local').value||null,
+    desc:    document.getElementById('trans-desc').value,
+  };
+  if (!data.fecha||!data.monto) return alert('Completá fecha y monto');
+  if (editId) {
+    const o=state.transferencias.find(x=>x.id===editId); if(o) Object.assign(o,data);
+  } else {
+    state.transferencias.push({id:uid(),...data});
+  }
+  save(); closeModal('modal-transferencia'); renderTransferencias(); updateTopbar();
+}
+
+function editarTransferencia(id) {
+  const t = state.transferencias.find(x=>x.id===id);
+  if (!t) return;
+  fillSelects();
+  document.getElementById('trans-id').value    = id;
+  document.getElementById('trans-modal-title').textContent = 'Editar Transferencia';
+  document.getElementById('trans-fecha').value = t.fecha||'';
+  document.getElementById('trans-tipo').value  = t.tipo||'ef-banco';
+  document.getElementById('trans-monto').value = t.monto||'';
+  document.getElementById('trans-local').value = t.localId||'';
+  document.getElementById('trans-desc').value  = t.desc||'';
+  document.getElementById('modal-transferencia').style.display='flex';
+}
+
+
 let currentFilter = { ingresos: 'todos', gastos: 'todos' };
 
 function filterMovs(tipo, val, el) {
@@ -2571,6 +2729,7 @@ function openModal(id) {
   const resets = {
     'modal-ingreso':  ['ing-id','ing-modal-title','Registrar Ingreso'],
     'modal-gasto':    ['gas-id','gas-modal-title','Registrar Gasto'],
+    'modal-transferencia':['trans-id','trans-modal-title','Nueva Transferencia'],
     'modal-cheque':   ['chq-id','chq-modal-title','Registrar Cheque'],
     'modal-proveedor':['prov-id','prov-modal-title','Nuevo Proveedor'],
     'modal-cliente':  ['cli-id','cli-modal-title','Nuevo Cliente'],
@@ -2581,7 +2740,7 @@ function openModal(id) {
     const elId = document.getElementById(rid); if(elId) elId.value='';
     const elT  = document.getElementById(rtitle); if(elT)  elT.textContent=rlabel;
   }
-  const dateFields = { 'modal-ingreso':'ing-fecha','modal-gasto':'gas-fecha','modal-caja':'caj-fecha','modal-cheque':'chq-emision' };
+  const dateFields = { 'modal-ingreso':'ing-fecha','modal-gasto':'gas-fecha','modal-caja':'caj-fecha','modal-cheque':'chq-emision','modal-transferencia':'trans-fecha' };
   if (dateFields[id]) document.getElementById(dateFields[id]).value = today();
   if (id === 'modal-caja') {
     ['caj-sistema','caj-banco','caj-gastos-ef','caj-parcial','caj-efectivo','caj-notas'].forEach(fid=>{
@@ -2749,7 +2908,7 @@ function fillSelects() {
     fillProvSubcat();
   }
 
-  ['ing-local','gas-local','obl-local'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=localOpts; });
+  ['ing-local','gas-local','obl-local','trans-local'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=localOpts; });
   const cajLocal = document.getElementById('caj-local');
   if (cajLocal) cajLocal.innerHTML = `<option value="">— Seleccioná —</option>` + (state.locales.map(l=>`<option value="${l.id}">${l.tipo==='pancheria'?'🌭':'🍦'} ${l.nombre}</option>`).join(''));
   ['ing-proveedor','gas-proveedor','obl-proveedor'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=provOpts; });
@@ -3027,7 +3186,7 @@ Object.assign(window, {
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
   autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat,
   cajRecalc, renderFlujo, abrirAjusteObl, guardarAjusteObl,
-  fabAction, updateBottomNav,
+  saveTransferencia, editarTransferencia, renderTransferencias,
 });
 </script>
 </body>
