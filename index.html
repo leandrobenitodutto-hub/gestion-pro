@@ -795,19 +795,11 @@
             <div class="section-sub">Proyección de ingresos y egresos</div>
           </div>
           <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2);text-transform:none;letter-spacing:0;font-weight:400">
-              <div class="toggle-wrap" onclick="toggleFlujoResultado()">
-                <input type="checkbox" id="chk-flujo-resultado" style="display:none" checked>
-                <div id="toggle-flujo" style="width:36px;height:20px;border-radius:10px;background:var(--accent);position:relative;transition:background 0.2s;cursor:pointer">
-                  <div id="toggle-flujo-knob" style="width:16px;height:16px;border-radius:50%;background:white;position:absolute;top:2px;left:18px;transition:left 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>
-                </div>
-              </div>
-              Ver Resultado y Saldo
-            </label>
             <select id="flujo-mes" onchange="renderFlujo()" style="width:auto"></select>
           </div>
         </div>
 
+        <!-- Stat cards resumen del mes -->
         <div class="grid-4" style="margin-bottom:24px">
           <div class="stat-card">
             <div class="stat-accent" style="background:var(--green)"></div>
@@ -819,7 +811,7 @@
             <div class="stat-label">Egresos del Mes</div>
             <div class="stat-value" id="flujo-total-eg">$0</div>
           </div>
-          <div class="stat-card flujo-resultado-col">
+          <div class="stat-card">
             <div class="stat-accent" style="background:var(--accent)"></div>
             <div class="stat-label">Resultado</div>
             <div class="stat-value" id="flujo-resultado">$0</div>
@@ -831,24 +823,10 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="section-header"><div class="section-title">Detalle por Semana</div></div>
-          <div class="table-wrap">
-            <table id="tabla-flujo-wrap">
-              <thead>
-                <tr>
-                  <th>Semana</th>
-                  <th class="mono">Ingresos</th>
-                  <th class="mono">Egresos</th>
-                  <th class="mono flujo-resultado-col">Resultado</th>
-                  <th class="mono flujo-resultado-col">Saldo Acum.</th>
-                </tr>
-              </thead>
-              <tbody id="tabla-flujo"></tbody>
-            </table>
-          </div>
-        </div>
+        <!-- Tarjetas semanales + mensuales (generadas por renderFlujo) -->
+        <div id="flujo-obl-proyectadas"></div>
 
+        <!-- Categorías -->
         <div class="grid-2" style="margin-top:20px">
           <div class="card">
             <div class="section-header"><div class="section-title">Ingresos por Categoría</div></div>
