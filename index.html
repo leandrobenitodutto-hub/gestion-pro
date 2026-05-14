@@ -1731,7 +1731,16 @@ let state = {
 };
 
 // ========================= FLUJO TOGGLE =========================
-function toggleFlujoResultado() {
+function toggleSemFlujo(id) {
+  const el = document.getElementById(id);
+  const arrow = document.getElementById(id+'-arrow');
+  if (!el) return;
+  const open = el.style.display === 'none';
+  el.style.display = open ? 'block' : 'none';
+  if (arrow) arrow.textContent = open ? '▲' : '▼';
+}
+
+
   const chk = document.getElementById('chk-flujo-resultado');
   const knob = document.getElementById('toggle-flujo-knob');
   const track = document.getElementById('toggle-flujo');
@@ -2706,87 +2715,169 @@ function renderFlujo() {
   const oblMensPend = state.obligaciones.filter(o=>o.freq==='mensual'&&o.estado!=='pagado');
 
   let acum = 0;
-  document.getElementById('tabla-flujo').innerHTML = semanas.map(s=>{
+  // ── TABLA SEMANAL EXPANDIBLE ──
+  let flujoHtml = '';
+  semanas.forEach(s => {
     const totalGastos = s.gasPag + s.oblPend + s.chqPend;
     acum += s.ing - totalGastos;
     const res2 = s.ing - totalGastos;
-    // Desglose cajas por local (tooltip style)
-    const localesStr = Object.entries(s.cajasPorLocal||{})
-      .sort((a,b)=>b[1]-a[1])
-      .map(([n,v])=>`<span style="font-size:10px;color:var(--text2);display:block">${n}: <span class="mono">${fmt(v)}</span></span>`)
-      .join('');
-    const chqStr = s.chqPend > 0
-      ? `<span style="font-size:10px;color:var(--orange);display:block;margin-top:2px">📄 Cheques: <span class="mono">${fmt(s.chqPend)}</span></span>`
-      : '';
-    return `<tr>
-      <td>${s.label}</td>
-      <td class="mono" style="color:var(--green)">
-        ${fmt(s.ing)}
-        <div style="margin-top:4px">${localesStr}</div>
-      </td>
-      <td class="mono" style="color:var(--red)">
-        ${fmt(totalGastos)}
-        ${chqStr}
-      </td>
-      <td class="mono flujo-resultado-col" style="color:${res2>=0?'var(--green)':'var(--red)'};font-weight:600">${fmt(res2)}</td>
-      <td class="mono flujo-resultado-col" style="color:${acum>=0?'var(--text)':'var(--red)'}">${fmt(acum)}</td>
-    </tr>`;
-  }).join('');
+    const semId = 'sem-det-' + s.semKey;
 
-  // Sección de obligaciones proyectadas con botón de ajuste
-  const oblPendTodas = state.obligaciones.filter(o=>o.estado!=='pagado');
-  let oblHtml = '';
-  if (oblPendTodas.length > 0) {
-    oblHtml = `<div class="card" style="margin-top:16px">
-      <div class="section-header">
+    // Instancias de esta semana
+    const instSem = state.oblInstancias.filter(i =>
+      i.periodo === mes && i.semLabel && i.semLabel.includes(`Sem ${s.label.match(/Sem (\d+)/)?.[1]}`) && i.estado !== 'saltado'
+    );
+    // Obligaciones mensuales del período
+    const instMen = state.oblInstancias.filter(i => i.periodo === mes && !i.semLabel && i.estado !== 'saltado');
+    // Cheques que vencen esta semana
+    const chqSem = state.cheques.filter(c => c.estado==='pendiente' && c.tipo==='emitido' && c.cobro>=s.d1 && c.cobro<=s.d2);
+    // Gastos pagados esta semana
+    const gasSem = state.gastos.filter(g => g.fecha>=s.d1 && g.fecha<=s.d2 && !g._oblId && !g._chqId);
+    // Locales
+    const localesStr = Object.entries(s.cajasPorLocal||{}).sort((a,b)=>b[1]-a[1])
+      .map(([n,v])=>`<div style="font-size:11px;color:var(--text2)">${n}: <span class="mono">${fmt(v)}</span></div>`).join('');
+
+    flujoHtml += `
+    <div class="card" style="margin-bottom:12px">
+      <!-- Cabecera de semana — clickeable para expandir -->
+      <div onclick="toggleSemFlujo('${semId}')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0">
         <div>
-          <div class="section-title">Obligaciones Proyectadas</div>
-          <div class="section-sub">Montos estimados pendientes de pago — tocá ✏ para ajustar el importe de un período puntual</div>
+          <div style="font-weight:700;font-size:14px">${s.label}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">
+            <span style="color:var(--green)">↑ ${fmt(s.ing)}</span>
+            <span style="margin:0 8px;color:var(--border)">|</span>
+            <span style="color:var(--red)">↓ ${fmt(totalGastos)}</span>
+            <span style="margin:0 8px;color:var(--border)">|</span>
+            <span style="color:${res2>=0?'var(--green)':'var(--red)'};font-weight:700">${res2>=0?'+':''}${fmt(res2)}</span>
+            ${instSem.filter(i=>i.estado==='pendiente').length > 0
+              ? `<span style="margin-left:8px;color:var(--orange)">⚠ ${instSem.filter(i=>i.estado==='pendiente').length} pendientes</span>`
+              : instSem.length > 0 ? `<span style="margin-left:8px;color:var(--green)">✓ Todo pagado</span>` : ''}
+          </div>
         </div>
+        <div style="font-size:18px;color:var(--text3)" id="${semId}-arrow">▼</div>
       </div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Obligación</th><th>Frecuencia</th><th class="hide-mobile">F.Pago</th><th class="mono">Monto Base</th>
-        ${semanas.map(s=>`<th class="mono" style="font-size:10px">${s.label.split(' ')[0]+' '+s.label.split(' ')[1]}</th>`).join('')}
-        </tr></thead>
-        <tbody>`;
-    oblPendTodas.forEach(o => {
-      oblHtml += `<tr>
-        <td style="font-weight:600;font-size:13px">${o.desc}</td>
-        <td><span class="badge badge-gray">${o.freq}</span></td>
-        <td class="hide-mobile">${tagPago(o.pago)}</td>
-        <td class="mono" style="color:var(--red)">${fmt(o.monto)}</td>`;
-      if (o.freq === 'semanal') {
-        semanas.forEach(s => {
-          const m = getMontoObl(o, s.semKey);
-          const ajustado = state.oblAjustes.find(a=>a.oblId===o.id&&a.semana===s.semKey);
-          oblHtml += `<td class="mono" style="font-size:12px">
-            ${fmt(m)}${ajustado?'<span style="color:var(--accent);font-size:10px"> ✎</span>':''}
-            <button class="btn btn-icon" style="padding:2px 5px;font-size:10px;margin-left:2px" 
-              onclick="abrirAjusteObl('${o.id}','${s.semKey}',${o.monto},'${o.desc} — ${s.label}')">✏</button>
-          </td>`;
-        });
-      } else {
-        // Mensual — una columna que abarca todo el mes
-        const m = getMontoObl(o, mes);
-        const ajustado = state.oblAjustes.find(a=>a.oblId===o.id&&a.semana===mes);
-        oblHtml += `<td class="mono" colspan="${semanas.length}" style="font-size:12px;text-align:center">
-          ${fmt(m)}${ajustado?'<span style="color:var(--accent);font-size:10px"> ✎</span>':''}
-          <button class="btn btn-icon" style="padding:2px 5px;font-size:10px;margin-left:4px"
-            onclick="abrirAjusteObl('${o.id}','${mes}',${o.monto},'${o.desc} — ${mes}')">✏</button>
-        </td>`;
-      }
-      oblHtml += '</tr>';
-    });
-    oblHtml += '</tbody></table></div></div>';
+
+      <!-- Detalle expandible -->
+      <div id="${semId}" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+
+        <!-- Ingresos por local -->
+        ${localesStr ? `<div style="margin-bottom:12px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📦 Ventas por local</div>
+          ${localesStr}
+        </div>` : ''}
+
+        <!-- Obligaciones semanales de esta semana -->
+        ${instSem.length > 0 ? `
+        <div style="margin-bottom:12px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📆 Obligaciones semanales</div>
+          ${instSem.map(inst => {
+            const obl = state.obligaciones.find(o=>o.id===inst.oblId)||{};
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+              <div>
+                <div style="font-size:13px;font-weight:600">${inst.oblDesc||obl.desc}</div>
+                <div style="font-size:11px;color:var(--text3)">${obl.cat||''}${obl.subcat?' › '+obl.subcat:''} · ${tagPago(inst.pago||obl.pago)}</div>
+                ${inst.estado==='pagado' ? `<div style="font-size:11px;color:var(--green)">✓ ${fmt(inst.montoPagado||inst.monto)} · ${fmtDate(inst.fechaPago)}</div>` : ''}
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="mono" style="color:${inst.estado==='pagado'?'var(--text3)':'var(--red)'}">${fmt(inst.monto)}</span>
+                ${inst.estado==='pendiente'
+                  ? `<button class="btn btn-primary btn-sm" onclick="pagarInstancia('${inst.id}');renderFlujo()">✓ Pagar</button>
+                     <button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia('${inst.id}');renderFlujo()">⊘</button>`
+                  : `<span class="badge badge-green" style="font-size:11px">✓</span>
+                     <button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia('${inst.id}');renderFlujo()">↩</button>`}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>` : `<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Sin instancias semanales — generalas desde <strong>Obligaciones</strong></div>`}
+
+        <!-- Cheques que vencen esta semana -->
+        ${chqSem.length > 0 ? `
+        <div style="margin-bottom:12px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📄 Cheques por vencer</div>
+          ${chqSem.map(c=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+              <div>
+                <div style="font-size:13px;font-weight:600">${c.titular||'Sin titular'} — N°${c.numero}</div>
+                <div style="font-size:11px;color:var(--text3)">Vence: ${fmtDate(c.cobro)}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="mono" style="color:var(--orange)">${fmt(c.monto)}</span>
+                <button class="btn btn-primary btn-sm" onclick="marcarCobrado('${c.id}');renderFlujo()">✓ Pagar</button>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
+
+        <!-- Gastos manuales registrados -->
+        ${gasSem.length > 0 ? `
+        <div>
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">💸 Gastos registrados</div>
+          ${gasSem.map(g=>{
+            const prov = state.proveedores.find(p=>p.id===g.provId);
+            return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+              <div style="font-size:12px">${g.desc||prov?.nombre||g.cat||'-'} <span style="color:var(--text3)">${fmtDate(g.fecha)}</span></div>
+              <span class="mono" style="color:var(--red);font-size:12px">${fmt(g.monto)}</span>
+            </div>`;
+          }).join('')}
+        </div>` : ''}
+      </div>
+    </div>`;
+  });
+
+  // Obligaciones mensuales — sección separada expandible
+  const instMenMes = state.oblInstancias.filter(i => i.periodo===mes && !i.semLabel && i.estado!=='saltado');
+  if (instMenMes.length > 0) {
+    const totalMenPend = instMenMes.filter(i=>i.estado==='pendiente').reduce((a,b)=>a+parseFloat(b.monto||0),0);
+    const totalMenPag = instMenMes.filter(i=>i.estado==='pagado').reduce((a,b)=>a+parseFloat(b.montoPagado||b.monto||0),0);
+    flujoHtml += `
+    <div class="card" style="margin-bottom:12px">
+      <div onclick="toggleSemFlujo('flujo-mensuales')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0">
+        <div>
+          <div style="font-weight:700;font-size:14px">📅 Obligaciones Mensuales</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">
+            <span style="color:var(--red)">Total: ${fmt(totalMenPend+totalMenPag)}</span>
+            <span style="margin:0 8px;color:var(--border)">|</span>
+            <span style="color:var(--green)">Pagado: ${fmt(totalMenPag)}</span>
+            <span style="margin:0 8px;color:var(--border)">|</span>
+            <span style="color:var(--orange)">Pendiente: ${fmt(totalMenPend)}</span>
+          </div>
+        </div>
+        <div style="font-size:18px;color:var(--text3)" id="flujo-mensuales-arrow">▼</div>
+      </div>
+      <div id="flujo-mensuales" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        ${instMenMes.map(inst => {
+          const obl = state.obligaciones.find(o=>o.id===inst.oblId)||{};
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-size:13px;font-weight:600">${inst.oblDesc||obl.desc}</div>
+              <div style="font-size:11px;color:var(--text3)">${obl.cat||''}${obl.subcat?' › '+obl.subcat:''} · Día ${obl.dia||'-'} · ${tagPago(inst.pago||obl.pago)}</div>
+              ${inst.estado==='pagado' ? `<div style="font-size:11px;color:var(--green)">✓ ${fmt(inst.montoPagado||inst.monto)} · ${fmtDate(inst.fechaPago)}</div>` : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="mono" style="color:${inst.estado==='pagado'?'var(--text3)':'var(--red)'};font-weight:600">${fmt(inst.monto)}</span>
+              ${inst.estado==='pendiente'
+                ? `<button class="btn btn-primary btn-sm" onclick="pagarInstancia('${inst.id}');renderFlujo()">✓ Pagar</button>
+                   <button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia('${inst.id}');renderFlujo()">⊘ Saltar</button>`
+                : `<span class="badge badge-green" style="font-size:11px">✓ Pagado</span>
+                   <button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia('${inst.id}');renderFlujo()">↩</button>`}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  } else {
+    flujoHtml += `<div class="card" style="margin-bottom:12px;padding:16px">
+      <div style="font-size:13px;color:var(--text3)">📅 Sin instancias mensuales — generalas desde <strong>Obligaciones → ⚡ Generar período</strong></div>
+    </div>`;
   }
-  // Insertar/actualizar sección obligaciones proyectadas
+
+  // Insertar en contenedor
   let secObl = document.getElementById('flujo-obl-proyectadas');
   if (!secObl) {
     secObl = document.createElement('div');
     secObl.id = 'flujo-obl-proyectadas';
     document.getElementById('page-flujo').appendChild(secObl);
   }
-  secObl.innerHTML = oblHtml;
+  secObl.innerHTML = flujoHtml;
 
   // Categorías ingresos — Ventas Locales como categoría propia + otros ingresos
   const catIng = { 'Ventas Locales': totalVentas };
@@ -3598,7 +3689,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 // Exponer todas las funciones al scope global (requerido por type="module")
 Object.assign(window, {
   navigate, openModal, closeModal, handleMenuToggle, toggleSidebar,
-  openMobileMenu, closeMobileMenu, toggleFlujoResultado,
+  openMobileMenu, closeMobileMenu, toggleFlujoResultado, toggleSemFlujo,
   filterMovs, filterCheques, filterCajas: ()=>renderCajas(),
   saveIngreso, saveGasto, saveCheque, saveObligacion, saveCaja,
   saveProveedor, saveCliente, saveLocal, saveCategoria, saveSubcategoria,
