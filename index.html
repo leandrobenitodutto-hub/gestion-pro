@@ -1,3 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GestiónPro — Control Financiero</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #18181c;
+    --surface2: #222228;
+    --border: #2e2e38;
+    --accent: #f0c040;
+    --accent2: #40c0a0;
+    --accent3: #e05050;
+    --text: #e8e8f0;
+    --text2: #9090a8;
+    --text3: #5a5a72;
+    --green: #40c080;
+    --red: #e05858;
+    --blue: #5090e0;
+    --orange: #e09040;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* LAYOUT */
+  #app { display: flex; height: 100vh; overflow: hidden; }
+  #sidebar {
+    width: 240px; min-width: 240px; background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 0; overflow-y: auto;
+    transition: width 0.25s ease, min-width 0.25s ease;
+    z-index: 100; flex-shrink: 0;
   }
   #sidebar.collapsed { width: 60px; min-width: 60px; }
   #sidebar.collapsed .nav-label,
@@ -635,34 +671,85 @@
             <div class="section-title">Obligaciones</div>
             <div class="section-sub">Pagos fijos mensuales y semanales</div>
           </div>
-          <button class="btn btn-primary" onclick="openModal('modal-obligacion')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Nueva Obligación
-          </button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <select id="obl-periodo-sel" onchange="renderObligaciones()" style="width:auto"></select>
+            <button class="btn btn-secondary" onclick="generarInstancias()" style="font-size:13px">
+              ⚡ Generar período
+            </button>
+            <button class="btn btn-primary" onclick="openModal('modal-obligacion')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nueva Obligación
+            </button>
+          </div>
         </div>
 
+        <!-- Stats del período -->
+        <div class="grid-4" style="margin-bottom:20px">
+          <div class="stat-card">
+            <div class="stat-accent" style="background:var(--red)"></div>
+            <div class="stat-label">Total del Período</div>
+            <div class="stat-value" id="obl-stat-total">$0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-accent" style="background:var(--green)"></div>
+            <div class="stat-label">Pagado</div>
+            <div class="stat-value" id="obl-stat-pagado" style="color:var(--green)">$0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-accent" style="background:var(--orange)"></div>
+            <div class="stat-label">Pendiente</div>
+            <div class="stat-value" id="obl-stat-pendiente" style="color:var(--orange)">$0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-accent" style="background:var(--blue)"></div>
+            <div class="stat-label">Instancias</div>
+            <div class="stat-value" id="obl-stat-count">0/0</div>
+          </div>
+        </div>
+
+        <!-- Instancias del período -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="section-header">
+            <div class="section-title" id="obl-periodo-titulo">Instancias del Período</div>
+          </div>
+          <div id="obl-instancias-empty" style="display:none">
+            <div class="empty">
+              <div class="empty-icon">📅</div>
+              <p>No hay instancias generadas para este período.<br>
+              Tocá <strong>⚡ Generar período</strong> para crear las obligaciones de este mes/semana.</p>
+            </div>
+          </div>
+          <div class="table-wrap" id="obl-instancias-wrap">
+            <table>
+              <thead><tr><th>Obligación</th><th class="hide-mobile">Categoría</th><th class="hide-mobile">Local</th><th class="hide-mobile">F.Pago</th><th class="mono">Monto Est.</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="tabla-instancias"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Plantillas -->
         <div class="grid-2">
           <div class="card">
             <div class="section-header">
-              <div class="section-title">📅 Mensuales</div>
-              <span id="total-mensuales" class="badge badge-red">$0</span>
+              <div class="section-title">📅 Plantillas Mensuales</div>
+              <span id="total-mensuales" class="badge badge-red">$0/mes</span>
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Descripción</th><th>Día</th><th class="hide-mobile">Categoría</th><th class="hide-mobile">F. Pago</th><th class="mono">Monto</th><th>Estado</th><th></th></tr></thead>
-                <tbody id="tabla-mensuales"><tr><td colspan="8"><div class="empty"><p>Sin obligaciones mensuales</p></div></td></tr></tbody>
+                <thead><tr><th>Descripción</th><th>Día</th><th class="hide-mobile">Monto</th><th></th></tr></thead>
+                <tbody id="tabla-mensuales"></tbody>
               </table>
             </div>
           </div>
           <div class="card">
             <div class="section-header">
-              <div class="section-title">📆 Semanales</div>
-              <span id="total-semanales" class="badge badge-orange">$0</span>
+              <div class="section-title">📆 Plantillas Semanales</div>
+              <span id="total-semanales" class="badge badge-orange">$0/sem</span>
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Descripción</th><th>Día</th><th class="hide-mobile">Categoría</th><th class="hide-mobile">F. Pago</th><th class="mono">Monto</th><th>Estado</th><th></th></tr></thead>
-                <tbody id="tabla-semanales"><tr><td colspan="8"><div class="empty"><p>Sin obligaciones semanales</p></div></td></tr></tbody>
+                <thead><tr><th>Descripción</th><th class="hide-mobile">Monto</th><th></th></tr></thead>
+                <tbody id="tabla-semanales"></tbody>
               </table>
             </div>
           </div>
@@ -771,6 +858,16 @@
             <div class="section-header"><div class="section-title">Gastos por Categoría</div></div>
             <div id="flujo-cat-gas"></div>
           </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Ventas por Local</div>
+              <div class="section-sub">Contribución de cada sucursal al ingreso del mes</div>
+            </div>
+          </div>
+          <div id="flujo-locales-desglose"></div>
         </div>
       </div>
 
@@ -1566,6 +1663,7 @@ async function loadFromFirebase() {
     showLoadingOverlay(false);
     // Inicializar UI
     initFlujoMes();
+    initOblPeriodo();
     updateTopbar();
     renderDashboard();
     checkMobile();
@@ -1629,6 +1727,7 @@ let state = {
   cajas: [],
   oblAjustes: [],
   transferencias: [],
+  oblInstancias: [], // { id, oblId, periodo, monto, pago, fecha, estado, _gastoId }
 };
 
 // ========================= FLUJO TOGGLE =========================
@@ -2102,93 +2201,288 @@ function desmarcarCobrado(id) {
 
 // ========================= OBLIGACIONES =========================
 function renderObligaciones() {
+  const periodo = document.getElementById('obl-periodo-sel')?.value || thisMonth();
+  const instPeriodo = state.oblInstancias.filter(i=>i.periodo===periodo);
+
+  // Stats
+  const totalEst = instPeriodo.filter(i=>i.estado!=='saltado').reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalPag = instPeriodo.filter(i=>i.estado==='pagado').reduce((a,b)=>a+parseFloat(b.montoPagado||b.monto||0),0);
+  const totalPend = instPeriodo.filter(i=>i.estado==='pendiente'&&i.estado!=='saltado').reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const pagadasCount = instPeriodo.filter(i=>i.estado==='pagado').length;
+  document.getElementById('obl-stat-total').textContent = fmt(totalEst);
+  document.getElementById('obl-stat-pagado').textContent = fmt(totalPag);
+  document.getElementById('obl-stat-pendiente').textContent = fmt(totalPend);
+  document.getElementById('obl-stat-count').textContent = `${pagadasCount}/${instPeriodo.length}`;
+
+  // Título período
+  const [y,m] = periodo.split('-');
+  const label = new Date(y,m-1,1).toLocaleString('es-AR',{month:'long',year:'numeric'});
+  document.getElementById('obl-periodo-titulo').textContent =
+    `${label.charAt(0).toUpperCase()+label.slice(1)} — Instancias`;
+
+  // Instancias
+  const wrap = document.getElementById('obl-instancias-wrap');
+  const empty = document.getElementById('obl-instancias-empty');
+  if (instPeriodo.length === 0) {
+    wrap.style.display = 'none';
+    empty.style.display = 'block';
+  } else {
+    wrap.style.display = 'block';
+    empty.style.display = 'none';
+    const tbody = document.getElementById('tabla-instancias');
+    // Separar mensuales y semanales, ordenar por estado (pendientes primero)
+    const sorted = [...instPeriodo].sort((a,b)=>{
+      const order = {pendiente:0, pagado:1, saltado:2};
+      if (a.estado===b.estado) return (a.oblDesc||'').localeCompare(b.oblDesc||'');
+      return (order[a.estado]||0) - (order[b.estado]||0);
+    });
+    tbody.innerHTML = sorted.map(inst=>{
+      const obl = state.obligaciones.find(o=>o.id===inst.oblId)||{};
+      const local = state.locales.find(l=>l.id===(inst.localId||obl.localId));
+      const pagBadge = inst.estado==='pagado'
+        ? `<span class="badge badge-green">✓ Pagado</span>`
+        : inst.estado==='saltado'
+        ? `<span class="badge badge-gray">⊘ No aplica</span>`
+        : `<span class="badge badge-orange">Pendiente</span>`;
+      const histBtn = `<button class="btn btn-icon btn-sm" title="Ver historial" onclick="verHistorialObl('${inst.oblId}')">📋</button>`;
+      return `<tr style="${inst.estado!=='pendiente'?'opacity:0.55':''}">
+        <td>
+          <div style="font-weight:600;font-size:13px">${inst.oblDesc||obl.desc||'-'}</div>
+          ${inst.semLabel?`<div style="font-size:11px;color:var(--text3)">${inst.semLabel}</div>`:''}
+          ${inst.estado==='pagado'?`<div style="font-size:11px;color:var(--green)">${fmt(inst.montoPagado||inst.monto)} · ${fmtDate(inst.fechaPago)}</div>`:''}
+          ${inst.estado==='saltado'?`<div style="font-size:11px;color:var(--text3)">Saltado — no impacta en el flujo</div>`:''}
+        </td>
+        <td class="hide-mobile"><span class="badge badge-gray" style="font-size:11px">${obl.cat||'-'}</span></td>
+        <td class="hide-mobile" style="font-size:12px;color:var(--text2)">${local?local.nombre:'-'}</td>
+        <td class="hide-mobile">${tagPago(inst.pago||obl.pago)}</td>
+        <td class="mono" style="color:${inst.estado==='saltado'?'var(--text3)':'var(--red)'};font-weight:600">${fmt(inst.monto)}</td>
+        <td>${pagBadge}</td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap">
+          ${inst.estado==='pendiente'
+            ? `<button class="btn btn-primary btn-sm" onclick="pagarInstancia('${inst.id}')">✓ Pagar</button>
+               <button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia('${inst.id}')" title="Esta semana no aplica">⊘ Saltar</button>`
+            : inst.estado==='saltado'
+            ? `<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="reactivarInstancia('${inst.id}')">↩ Reactivar</button>`
+            : `<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia('${inst.id}')">↩ Revertir</button>`}
+          ${histBtn}
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Plantillas
   const mensuales = state.obligaciones.filter(o=>o.freq==='mensual');
   const semanales = state.obligaciones.filter(o=>o.freq==='semanal');
   const totalMen = mensuales.reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const totalSem = semanales.reduce((a,b)=>a+parseFloat(b.monto||0),0);
-  document.getElementById('total-mensuales').textContent = fmt(totalMen) + '/mes';
-  document.getElementById('total-semanales').textContent = fmt(totalSem) + '/sem';
+  document.getElementById('total-mensuales').textContent = fmt(totalMen)+'/mes';
+  document.getElementById('total-semanales').textContent = fmt(totalSem)+'/sem';
 
-  const renderObl = (list, tbodyId) => {
+  const renderPlantilla = (list, tbodyId, cols) => {
     const tbody = document.getElementById(tbodyId);
-    if (list.length === 0) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><p>Sin obligaciones</p></div></td></tr>`; return; }
+    if (!list.length) { tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty"><p>Sin plantillas</p></div></td></tr>`; return; }
     tbody.innerHTML = list.map(o=>`<tr>
       <td>
         <div style="font-weight:600;font-size:13px">${o.desc}</div>
-        ${getProvNombre(o.provId)!=='-'?`<div style="font-size:11px;color:var(--text3)">${getProvNombre(o.provId)}</div>`:''}
+        <div style="font-size:11px;color:var(--text3)">${o.cat||''}${o.subcat?' › '+o.subcat:''}</div>
       </td>
-      <td style="font-size:12px;color:var(--text3)">Día ${o.dia}</td>
-      <td class="hide-mobile">
-        <span class="badge badge-gray">${o.cat||'-'}</span>
-        ${o.subcat?`<span style="font-size:11px;color:var(--text3);display:block;margin-top:2px">${o.subcat}</span>`:''}
-      </td>
-      <td class="hide-mobile">${tagPago(o.pago)}</td>
-      <td class="mono" style="color:var(--red);font-weight:600">${fmt(o.monto)}</td>
-      <td><span class="badge ${o.estado==='pagado'?'badge-green':'badge-orange'}">${o.estado==='pagado'?'✓ Pagado':'Pendiente'}</span></td>
-      <td style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
-        ${o.estado!=='pagado'
-          ? `<button class="btn btn-primary btn-sm" onclick="pagarObl('${o.id}')">✓ Pagar</button>`
-          : `<button class="btn btn-secondary btn-sm" onclick="despagarObl('${o.id}')">↩ Deshacer</button>`
-        }
-        <button class="btn btn-secondary btn-sm" onclick="editarObl('${o.id}')">✏</button>
-        <button class="btn btn-icon" onclick="del('obligaciones','${o.id}');renderObligaciones()">🗑</button>
+      ${o.freq==='mensual'?`<td style="font-size:12px;color:var(--text3)">Día ${o.dia||'-'}</td>`:''}
+      <td class="mono hide-mobile" style="color:var(--red)">${fmt(o.monto)}</td>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-icon btn-sm" onclick="editarObl('${o.id}')">✏</button>
+        <button class="btn btn-icon btn-sm" onclick="verHistorialObl('${o.id}')">📋</button>
+        <button class="btn btn-icon btn-sm" onclick="del('obligaciones','${o.id}');renderObligaciones()">🗑</button>
       </td>
     </tr>`).join('');
   };
-  renderObl(mensuales, 'tabla-mensuales');
-  renderObl(semanales, 'tabla-semanales');
+  renderPlantilla(mensuales, 'tabla-mensuales', 4);
+  renderPlantilla(semanales, 'tabla-semanales', 3);
 }
 
-function pagarObl(id) {
-  const o = state.obligaciones.find(x=>x.id===id);
-  if (!o) return;
-  // Abrir modal de confirmación con monto editable
+function generarInstancias() {
+  const periodo = document.getElementById('obl-periodo-sel')?.value || thisMonth();
+  const [y,m] = periodo.split('-').map(Number);
+  const label = new Date(y,m-1,1).toLocaleString('es-AR',{month:'long',year:'numeric'});
+
+  // Verificar si ya existen instancias del período
+  const yaExisten = state.oblInstancias.filter(i=>i.periodo===periodo);
+  if (yaExisten.length > 0) {
+    if (!confirm(`Ya hay ${yaExisten.length} instancias para ${label}.\n¿Querés agregar las que faltan (sin duplicar)?`)) return;
+  }
+
+  let nuevas = 0;
+  const oblIds = new Set(yaExisten.map(i=>i.oblId+'|'+(i.semLabel||'')));
+
+  // Mensuales — 1 instancia por obligación
+  state.obligaciones.filter(o=>o.freq==='mensual').forEach(o=>{
+    const key = o.id+'|';
+    if (!oblIds.has(key)) {
+      state.oblInstancias.push({
+        id: uid(), oblId: o.id, oblDesc: o.desc,
+        periodo, monto: parseFloat(o.monto||0),
+        pago: o.pago||'efectivo', localId: o.localId||null,
+        estado: 'pendiente', semLabel: '',
+      });
+      nuevas++;
+    }
+  });
+
+  // Semanales — 1 instancia por semana del mes
+  const diasMes = new Date(y, m, 0).getDate();
+  const pad = n=>String(n).padStart(2,'0');
+  let semNum = 0;
+  for (let s=0; s<5; s++) {
+    const desde = s*7+1;
+    if (desde > diasMes) break;
+    const hasta = Math.min(desde+6, diasMes);
+    semNum++;
+    const semLabel = `Sem ${semNum} (${pad(desde)}/${pad(m)}-${pad(hasta)}/${pad(m)})`;
+    state.obligaciones.filter(o=>o.freq==='semanal').forEach(o=>{
+      const key = o.id+'|'+semLabel;
+      if (!oblIds.has(key)) {
+        state.oblInstancias.push({
+          id: uid(), oblId: o.id, oblDesc: o.desc,
+          periodo, monto: parseFloat(o.monto||0),
+          pago: o.pago||'efectivo', localId: o.localId||null,
+          estado: 'pendiente', semLabel,
+        });
+        nuevas++;
+      }
+    });
+  }
+
+  save();
+  renderObligaciones();
+  showToast(`✓ ${nuevas} instancias generadas para ${label.charAt(0).toUpperCase()+label.slice(1)}`);
+}
+
+function pagarInstancia(id) {
+  const inst = state.oblInstancias.find(i=>i.id===id);
+  if (!inst) return;
+  const obl = state.obligaciones.find(o=>o.id===inst.oblId)||{};
   document.getElementById('pagar-obl-id').value    = id;
-  document.getElementById('pagar-obl-nombre').textContent = o.desc;
-  document.getElementById('pagar-obl-monto').value = o.monto;
+  document.getElementById('pagar-obl-nombre').textContent = inst.oblDesc || obl.desc;
+  document.getElementById('pagar-obl-monto').value = inst.monto;
   document.getElementById('pagar-obl-fecha').value = today();
-  document.getElementById('pagar-obl-pago').value  = o.pago || 'efectivo';
+  document.getElementById('pagar-obl-pago').value  = inst.pago || obl.pago || 'efectivo';
   document.getElementById('modal-pagar-obl').style.display = 'flex';
 }
 
 function confirmarPagoObl() {
-  const id     = document.getElementById('pagar-obl-id').value;
-  const monto  = document.getElementById('pagar-obl-monto').value;
-  const fecha  = document.getElementById('pagar-obl-fecha').value;
-  const pago   = document.getElementById('pagar-obl-pago').value;
+  const id    = document.getElementById('pagar-obl-id').value;
+  const monto = parseFloat(document.getElementById('pagar-obl-monto').value);
+  const fecha = document.getElementById('pagar-obl-fecha').value;
+  const pago  = document.getElementById('pagar-obl-pago').value;
   if (!monto || !fecha) return alert('Completá monto y fecha');
-  const o = state.obligaciones.find(x=>x.id===id);
-  if (!o) return;
-  o.estado    = 'pagado';
-  o.fechaPago = fecha;
-  const gasto = {
-    id: uid(), fecha, monto: parseFloat(monto),
-    pago, cat: o.cat||'', subcat: o.subcat||'',
-    localId: o.localId||null, provId: o.provId||null,
-    desc: `[Obligación] ${o.desc}`, _oblId: id,
-  };
-  state.gastos.push(gasto);
+  const inst = state.oblInstancias.find(i=>i.id===id);
+  if (!inst) return;
+  const obl = state.obligaciones.find(o=>o.id===inst.oblId)||{};
+  inst.estado      = 'pagado';
+  inst.fechaPago   = fecha;
+  inst.montoPagado = monto;
+  inst.pago        = pago;
+  // Generar gasto automático
+  const gastoId = uid();
+  state.gastos.push({
+    id: gastoId, fecha, monto,
+    pago, cat: obl.cat||'', subcat: obl.subcat||'',
+    localId: inst.localId||obl.localId||null,
+    provId: obl.provId||null,
+    desc: `[Obligación] ${inst.oblDesc||obl.desc}`,
+    _oblId: inst.oblId,
+    _instId: id,
+  });
+  inst._gastoId = gastoId;
   save();
   closeModal('modal-pagar-obl');
   renderObligaciones();
   updateTopbar();
-  const dif = parseFloat(monto) - parseFloat(o.monto);
-  const difTxt = dif !== 0 ? ` (${dif>0?'+':''}${fmt(dif)} vs estimado)` : '';
-  showToast(`✓ "${o.desc}" — ${fmt(monto)} pagado en ${pago==='efectivo'?'💵 Caja':pago==='banco'?'🏦 Banco':'📄 Cheque'}${difTxt}`);
+  const dif = monto - parseFloat(inst.monto);
+  const difTxt = dif!==0?` (${dif>0?'+':''}${fmt(dif)} vs estimado)`:'';
+  showToast(`✓ "${inst.oblDesc}" — ${fmt(monto)} pagado${difTxt}`);
 }
 
-function despagarObl(id) {
-  const o = state.obligaciones.find(x=>x.id===id);
-  if (!o) return;
-  if (!confirm(`¿Revertir el pago de "${o.desc}"? Se eliminará el gasto generado.`)) return;
-  o.estado = 'pendiente';
-  delete o.fechaPago;
-  // Eliminar el gasto automático asociado
-  state.gastos = state.gastos.filter(g => g._oblId !== id);
+function despagarInstancia(id) {
+  const inst = state.oblInstancias.find(i=>i.id===id);
+  if (!inst) return;
+  if (!confirm(`¿Revertir el pago de "${inst.oblDesc}"? Se eliminará el gasto generado.`)) return;
+  inst.estado = 'pendiente';
+  delete inst.fechaPago;
+  delete inst.montoPagado;
+  if (inst._gastoId) {
+    state.gastos = state.gastos.filter(g=>g.id!==inst._gastoId);
+    delete inst._gastoId;
+  }
   save();
   renderObligaciones();
   updateTopbar();
+  showToast('↩ Pago revertido');
 }
+
+function verHistorialObl(oblId) {
+  const obl = state.obligaciones.find(o=>o.id===oblId);
+  if (!obl) return;
+  const instancias = state.oblInstancias
+    .filter(i=>i.oblId===oblId)
+    .sort((a,b)=>b.periodo>a.periodo?1:-1);
+  let html = `<div style="font-weight:700;font-size:15px;margin-bottom:16px">${obl.desc}</div>`;
+  if (instancias.length===0) {
+    html += `<div style="color:var(--text3);font-size:13px">Sin historial de pagos registrado.</div>`;
+  } else {
+    html += `<div style="font-size:12px;max-height:400px;overflow-y:auto">`;
+    instancias.forEach(inst=>{
+      const [y,m] = inst.periodo.split('-');
+      const perLabel = new Date(y,m-1,1).toLocaleString('es-AR',{month:'long',year:'numeric'});
+      const perStr = perLabel.charAt(0).toUpperCase()+perLabel.slice(1);
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-weight:600">${perStr}${inst.semLabel?' — '+inst.semLabel:''}</div>
+          ${inst.estado==='pagado'?`<div style="color:var(--text3);font-size:11px">${fmtDate(inst.fechaPago)} · ${inst.pago}</div>`:''}
+        </div>
+        <div style="text-align:right">
+          ${inst.estado==='pagado'
+            ? `<span class="badge badge-green">✓ ${fmt(inst.montoPagado||inst.monto)}</span>`
+            : `<span class="badge badge-orange">Pendiente ${fmt(inst.monto)}</span>`}
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  // Mostrar en modal de ajuste reutilizando su overlay
+  const overlay = document.getElementById('modal-ajuste-obl');
+  document.getElementById('ajuste-obl-info').innerHTML = html;
+  document.getElementById('ajuste-obl-id').value = '';
+  document.getElementById('ajuste-obl-semana').value = '';
+  document.getElementById('ajuste-obl-monto').style.display = 'none';
+  // Ocultar botón guardar y mostrar solo cerrar
+  const footer = overlay.querySelector('.modal-footer');
+  if (footer) footer.innerHTML = `<button class="btn btn-secondary" onclick="closeModal('modal-ajuste-obl');document.getElementById('ajuste-obl-monto').style.display='';location.reload&&renderObligaciones()">Cerrar</button>`;
+  overlay.style.display = 'flex';
+}
+
+function saltarInstancia(id) {
+  const inst = state.oblInstancias.find(i=>i.id===id);
+  if (!inst) return;
+  inst.estado = 'saltado';
+  save();
+  renderObligaciones();
+  showToast(`⊘ "${inst.oblDesc}" marcada como "no aplica" esta semana`);
+}
+
+function reactivarInstancia(id) {
+  const inst = state.oblInstancias.find(i=>i.id===id);
+  if (!inst) return;
+  inst.estado = 'pendiente';
+  save();
+  renderObligaciones();
+  showToast(`↩ "${inst.oblDesc}" reactivada`);
+}
+
+
+function pagarObl(id) { pagarInstancia(id); }
+function despagarObl(id) { despagarInstancia(id); }
+
+
 
 function abrirAjusteObl(oblId, semanaKey, montoBase, label) {
   // semanaKey = "2026-05-S2" (mes + número de semana) o "2026-05" para mensual
@@ -2345,12 +2639,13 @@ function renderFlujo() {
   const [year, month] = mes.split('-').map(Number);
 
   const ingMes = state.ingresos.filter(i=>i.fecha&&i.fecha.startsWith(mes));
-  // Gastos manuales (excluir los generados automáticamente por obligaciones para no contar doble)
-  const gasMes = state.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mes) && !g._oblId);
-  // Obligaciones pagadas este mes (generan su propio gasto, pero los contamos desde acá para el flujo)
+  // Gastos manuales (excluir los generados automáticamente por obligaciones y cheques)
+  const gasMes = state.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mes) && !g._oblId && !g._chqId);
+  // Obligaciones pagadas este mes (instancias pagadas en este período)
   const oblPagadasMes = state.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mes) && g._oblId);
-  // Obligaciones pendientes (proyección)
-  const oblPendientesMes = state.obligaciones.filter(o=>o.estado!=='pagado');
+  // Obligaciones pendientes — instancias pendientes del período actual
+  const instPeriodoFlujo = state.oblInstancias.filter(i=>i.periodo===mes&&i.estado==='pendiente');
+  const oblPendientesMes = instPeriodoFlujo;
   const cajMes = state.cajas.filter(c=>c.fecha&&c.fecha.startsWith(mes));
 
   // Ventas locales (cajas) + otros ingresos — sin doble conteo
@@ -2360,13 +2655,14 @@ function renderFlujo() {
   // Egresos = gastos manuales + obligaciones pagadas este mes
   const totalGas = gasMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const totalOblPag = oblPagadasMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
-  const totalOblPend = oblPendientesMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalOblPend = instPeriodoFlujo.reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const totalEgresos = totalGas + totalOblPag;
   const chqMes = state.cheques.filter(c=>c.cobro&&c.cobro.startsWith(mes)&&c.estado==='pendiente'&&c.tipo==='emitido').reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalEgresosConCheques = totalEgresos + chqMes;
 
   document.getElementById('flujo-total-ing').textContent = fmt(totalIng);
-  document.getElementById('flujo-total-eg').textContent = fmt(totalEgresos);
-  const res = totalIng - totalEgresos;
+  document.getElementById('flujo-total-eg').textContent = fmt(totalEgresosConCheques);
+  const res = totalIng - totalEgresosConCheques;
   const resEl = document.getElementById('flujo-resultado');
   resEl.textContent = fmt(res);
   resEl.style.color = res >= 0 ? 'var(--green)' : 'var(--red)';
@@ -2384,27 +2680,54 @@ function renderFlujo() {
     const d2 = `${year}-${pad(month)}-${pad(hasta)}`;
     const semKey = `${mes}-S${s+1}`;
     const sVentas   = cajMes.filter(c=>c.fecha>=d1&&c.fecha<=d2).reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
-    const sOtrosIng = ingMes.filter(i=>i.fecha>=d1&&i.fecha<=d2).reduce((a,b)=>a+parseFloat(b.monto||0),0);
-    const sGasManuales = state.gastos.filter(g=>g.fecha>=d1&&g.fecha<=d2&&!g._oblId).reduce((a,b)=>a+parseFloat(b.monto||0),0);
+    const sOtrosIng = ingMes.filter(i=>i.fecha>=d1&&i.fecha<=d2).reduce((a,b)=>a+parseFloat(i.monto||0),0);
+    const sGasManuales = state.gastos.filter(g=>g.fecha>=d1&&g.fecha<=d2&&!g._oblId&&!g._chqId).reduce((a,b)=>a+parseFloat(b.monto||0),0);
     const sOblPag   = state.gastos.filter(g=>g.fecha>=d1&&g.fecha<=d2&&g._oblId).reduce((a,b)=>a+parseFloat(b.monto||0),0);
+    const sChqPend  = state.cheques.filter(c=>c.estado==='pendiente'&&c.tipo==='emitido'&&c.cobro>=d1&&c.cobro<=d2)
+                        .reduce((a,b)=>a+parseFloat(b.monto||0),0);
     // Obligaciones semanales pendientes con ajuste por semana
-    const sOblPend  = state.obligaciones.filter(o=>o.freq==='semanal'&&o.estado!=='pagado')
-                        .reduce((a,o)=>a+getMontoObl(o, semKey),0);
+    // Obligaciones semanales: usar instancias si existen, sino estimado de plantilla
+    const instSem = state.oblInstancias.filter(i=>i.periodo===mes&&i.semLabel&&i.semLabel.includes(`Sem ${s+1}`)&&i.estado!=='saltado');
+    const sOblPend = instSem.length > 0
+      ? instSem.filter(i=>i.estado==='pendiente').reduce((a,b)=>a+parseFloat(b.monto||0),0)
+      : state.obligaciones.filter(o=>o.freq==='semanal').reduce((a,o)=>a+getMontoObl(o,semKey),0);
+    // Desglose cajas por local esa semana
+    const cajSemana = cajMes.filter(c=>c.fecha>=d1&&c.fecha<=d2);
+    const cajasPorLocal = {};
+    cajSemana.forEach(c=>{
+      const local = state.locales.find(l=>l.id===c.localId);
+      const nombre = local ? local.nombre : (c._sucursal||'Sin local');
+      cajasPorLocal[nombre] = (cajasPorLocal[nombre]||0) + parseFloat(c.totalReal||0);
+    });
     semanas.push({ label:`Sem ${s+1} (${pad(desde)}/${pad(month)}-${pad(hasta)}/${pad(month)})`, semKey, d1, d2,
-      ing: sVentas+sOtrosIng, gasPag: sGasManuales+sOblPag, oblPend: sOblPend });
+      ing: sVentas+sOtrosIng, gasPag: sGasManuales+sOblPag, oblPend: sOblPend, chqPend: sChqPend, cajasPorLocal });
   }
   // Para mensuales pendientes usamos la clave del mes completo
   const oblMensPend = state.obligaciones.filter(o=>o.freq==='mensual'&&o.estado!=='pagado');
 
   let acum = 0;
   document.getElementById('tabla-flujo').innerHTML = semanas.map(s=>{
-    const totalGastos = s.gasPag + s.oblPend;
+    const totalGastos = s.gasPag + s.oblPend + s.chqPend;
     acum += s.ing - totalGastos;
     const res2 = s.ing - totalGastos;
+    // Desglose cajas por local (tooltip style)
+    const localesStr = Object.entries(s.cajasPorLocal||{})
+      .sort((a,b)=>b[1]-a[1])
+      .map(([n,v])=>`<span style="font-size:10px;color:var(--text2);display:block">${n}: <span class="mono">${fmt(v)}</span></span>`)
+      .join('');
+    const chqStr = s.chqPend > 0
+      ? `<span style="font-size:10px;color:var(--orange);display:block;margin-top:2px">📄 Cheques: <span class="mono">${fmt(s.chqPend)}</span></span>`
+      : '';
     return `<tr>
       <td>${s.label}</td>
-      <td class="mono" style="color:var(--green)">${fmt(s.ing)}</td>
-      <td class="mono" style="color:var(--red)">${fmt(totalGastos)}</td>
+      <td class="mono" style="color:var(--green)">
+        ${fmt(s.ing)}
+        <div style="margin-top:4px">${localesStr}</div>
+      </td>
+      <td class="mono" style="color:var(--red)">
+        ${fmt(totalGastos)}
+        ${chqStr}
+      </td>
       <td class="mono flujo-resultado-col" style="color:${res2>=0?'var(--green)':'var(--red)'};font-weight:600">${fmt(res2)}</td>
       <td class="mono flujo-resultado-col" style="color:${acum>=0?'var(--text)':'var(--red)'}">${fmt(acum)}</td>
     </tr>`;
@@ -2480,10 +2803,13 @@ function renderFlujo() {
         <div class="progress-bar"><div class="progress-fill" style="background:var(--green);width:${totalIng?Math.round(v/totalIng*100):0}%"></div></div>
       </div>`).join('');
 
-  // Categorías gastos — incluye gastos manuales + obligaciones pagadas este mes
+  // Categorías gastos — incluye gastos manuales + obligaciones pagadas + cheques pendientes del mes
   const catGas = {};
-  gasMes.forEach(g=>{ catGas[g.cat||'Sin categoría'] = (catGas[g.cat||'Sin categoría']||0) + parseFloat(g.monto||0); });
+  gasMes.forEach(g=>{ if(!g._chqId) catGas[g.cat||'Sin categoría'] = (catGas[g.cat||'Sin categoría']||0) + parseFloat(g.monto||0); });
   oblPagadasMes.forEach(g=>{ catGas[g.cat||'Obligaciones'] = (catGas[g.cat||'Obligaciones']||0) + parseFloat(g.monto||0); });
+  // Cheques pendientes del mes como proyección
+  state.cheques.filter(c=>c.cobro&&c.cobro.startsWith(mes)&&c.estado==='pendiente'&&c.tipo==='emitido')
+    .forEach(c=>{ catGas[c.cat||'Cheques Pendientes'] = (catGas[c.cat||'Cheques Pendientes']||0) + parseFloat(c.monto||0); });
   document.getElementById('flujo-cat-gas').innerHTML = Object.entries(catGas).length === 0 ? '<div class="empty"><p>Sin datos</p></div>'
     : Object.entries(catGas).sort((a,b)=>b[1]-a[1]).map(([cat,v])=>`
       <div style="margin-bottom:10px">
@@ -2491,8 +2817,28 @@ function renderFlujo() {
           <span style="font-size:13px">${cat}</span>
           <span class="mono" style="font-size:12px;color:var(--red)">${fmt(v)}</span>
         </div>
-        <div class="progress-bar"><div class="progress-fill" style="background:var(--red);width:${totalEgresos?Math.round(v/totalEgresos*100):0}%"></div></div>
+        <div class="progress-bar"><div class="progress-fill" style="background:var(--red);width:${totalEgresosConCheques?Math.round(v/totalEgresosConCheques*100):0}%"></div></div>
       </div>`).join('');
+  // Desglose cajas por local — sección aparte en ingresos
+  const cajasPorLocalMes = {};
+  cajMes.forEach(c=>{
+    const local = state.locales.find(l=>l.id===c.localId);
+    const nombre = local ? local.nombre : (c._sucursal||'Sin local');
+    cajasPorLocalMes[nombre] = (cajasPorLocalMes[nombre]||0) + parseFloat(c.totalReal||0);
+  });
+  const flujoLocalesEl = document.getElementById('flujo-locales-desglose');
+  if (flujoLocalesEl) {
+    flujoLocalesEl.innerHTML = Object.entries(cajasPorLocalMes).length === 0
+      ? '<div class="empty"><p>Sin datos de cajas</p></div>'
+      : Object.entries(cajasPorLocalMes).sort((a,b)=>b[1]-a[1]).map(([nombre,v])=>`
+        <div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:13px">${nombre}</span>
+            <span class="mono" style="font-size:12px;color:var(--green)">${fmt(v)}</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="background:var(--green);width:${totalVentas?Math.round(v/totalVentas*100):0}%"></div></div>
+        </div>`).join('');
+  }
 }
 
 // ========================= CLIENTES =========================
@@ -3216,7 +3562,21 @@ function del(tipo, id) {
 }
 
 // ========================= INIT =========================
-function initFlujoMes() {
+function initOblPeriodo() {
+  const sel = document.getElementById('obl-periodo-sel');
+  if (!sel) return;
+  const meses = [];
+  const now = new Date();
+  for (let i = 3; i >= -3; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const val = d.toISOString().slice(0,7);
+    const label = d.toLocaleString('es-AR',{month:'long',year:'numeric'});
+    meses.push(`<option value="${val}" ${val===thisMonth()?'selected':''}>${label.charAt(0).toUpperCase()+label.slice(1)}</option>`);
+  }
+  sel.innerHTML = meses.join('');
+}
+
+
   const sel = document.getElementById('flujo-mes');
   const meses = [];
   const now = new Date();
@@ -3243,6 +3603,7 @@ Object.assign(window, {
   saveIngreso, saveGasto, saveCheque, saveObligacion, saveCaja,
   saveProveedor, saveCliente, saveLocal, saveCategoria, saveSubcategoria,
   marcarCobrado, pagarObl, confirmarPagoObl, despagarObl,
+  pagarInstancia, despagarInstancia, saltarInstancia, reactivarInstancia, generarInstancias, verHistorialObl,
   editarMov, editarCheque, editarCaja, editarProveedor, editarCliente,
   editarLocal, editarCat, editarObl, editarSubcat,
   eliminarCat, eliminarSubcat,
@@ -3256,3 +3617,4 @@ Object.assign(window, {
 </script>
 </body>
 </html>
+
