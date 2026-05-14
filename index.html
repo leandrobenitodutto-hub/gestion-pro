@@ -1094,6 +1094,33 @@
         <label>Titular / Beneficiario</label>
         <input type="text" id="chq-titular" placeholder="Nombre del titular o beneficiario">
       </div>
+      <!-- Sección pago/gasto -->
+      <div class="form-group full">
+        <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:2px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:10px;font-weight:600">
+            ⚡ Al marcar como pagado genera un gasto automático
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Proveedor</label>
+        <select id="chq-proveedor" onchange="autocompletarDesdeProv_Cheque()"></select>
+      </div>
+      <div class="form-group">
+        <label>Forma de Pago</label>
+        <select id="chq-pago">
+          <option value="banco">🏦 Banco</option>
+          <option value="efectivo">💵 Efectivo</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Categoría</label>
+        <select id="chq-cat" onchange="fillChqSubcat()"></select>
+      </div>
+      <div class="form-group">
+        <label>Subcategoría</label>
+        <select id="chq-subcat"></select>
+      </div>
       <div class="form-group full">
         <label>Notas</label>
         <textarea id="chq-notas" placeholder="Observaciones..."></textarea>
@@ -2026,17 +2053,20 @@ function renderCheques() {
     const est = vencido ? 'vencido' : c.estado;
     const estBadge = est==='pendiente' ? 'badge-orange' : est==='cobrado' ? 'badge-green' : 'badge-red';
     const estLabel = est==='pendiente' ? 'Pendiente' : est==='cobrado' ? 'Cobrado' : 'Vencido';
+    const prov = state.proveedores.find(p=>p.id===c.provId);
     return `<tr>
       <td class="mono">${c.numero}</td>
-      <td>${fmtDate(c.emision)}</td>
+      <td>${fmtDate(c.emision||c.cobro)}</td>
       <td>${fmtDate(c.cobro)}</td>
       <td><span class="badge ${c.tipo==='recibido'?'badge-green':'badge-red'}">${c.tipo==='recibido'?'↓ Recibido':'↑ Emitido'}</span></td>
-      <td>${c.titular}</td>
-      <td style="font-size:12px">${c.banco}</td>
+      <td>${c.titular||'-'}</td>
+      <td style="font-size:12px;color:var(--text2)">${prov?prov.nombre:(c.banco||'-')}</td>
       <td class="mono" style="font-weight:600">${fmt(c.monto)}</td>
       <td><span class="badge ${estBadge}">${estLabel}</span></td>
-      <td>
-        ${c.estado==='pendiente'?`<button class="btn btn-secondary btn-sm" onclick="marcarCobrado('${c.id}')">✓ Cobrar</button>`:''} 
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        ${c.estado==='pendiente'
+          ? `<button class="btn btn-secondary btn-sm" onclick="marcarCobrado('${c.id}')">✓ Cobrar</button>`
+          : `<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="desmarcarCobrado('${c.id}')">↩ Revertir</button>`}
         <button class="btn btn-icon" onclick="editarCheque('${c.id}')">✏</button>
         <button class="btn btn-icon" onclick="del('cheques','${c.id}');renderCheques()">🗑</button>
       </td>
@@ -2044,9 +2074,66 @@ function renderCheques() {
   }).join('');
 }
 
+function autocompletarDesdeProv_Cheque() {
+  const provId = document.getElementById('chq-proveedor').value;
+  const prov = state.proveedores.find(p=>p.id===provId);
+  if (!prov) return;
+  // Titular
+  const titular = document.getElementById('chq-titular');
+  if (titular && !titular.value) titular.value = prov.nombre;
+  // Categoria
+  const catSel = document.getElementById('chq-cat');
+  if (catSel && prov.cat) {
+    catSel.value = prov.cat;
+    fillChqSubcat();
+    setTimeout(()=>{ const s=document.getElementById('chq-subcat'); if(s&&prov.subcat) s.value=prov.subcat; },50);
+  }
+}
+
+function fillChqSubcat() {
+  const cat = document.getElementById('chq-cat')?.value;
+  const catObj = state.categorias.find(c=>c.nombre===cat);
+  const sel = document.getElementById('chq-subcat');
+  if (!sel) return;
+  sel.innerHTML = (catObj?.subs||[]).map(s=>`<option value="${s}">${s}</option>`).join('');
+}
+
 function marcarCobrado(id) {
   const c = state.cheques.find(x=>x.id===id);
-  if (c) { c.estado = 'cobrado'; save(); renderCheques(); updateTopbar(); }
+  if (!c) return;
+  c.estado = 'cobrado';
+  // Generar gasto automático si tiene proveedor y categoría
+  if (c.provId && c.cat) {
+    const gastoId = uid();
+    state.gastos.push({
+      id: gastoId,
+      fecha: c.cobro || today(),
+      monto: c.monto,
+      pago: c.pago || 'banco',
+      cat: c.cat,
+      subcat: c.subcat || '',
+      provId: c.provId,
+      localId: null,
+      desc: `Cheque N°${c.numero}`,
+      _chqId: id, // referencia para poder revertir
+    });
+    c._gastoId = gastoId;
+  }
+  save(); renderCheques(); updateTopbar();
+  showToast('✓ Cheque marcado como cobrado' + (c.provId && c.cat ? ' — gasto generado' : ''));
+}
+
+function desmarcarCobrado(id) {
+  const c = state.cheques.find(x=>x.id===id);
+  if (!c) return;
+  c.estado = 'pendiente';
+  // Eliminar gasto generado si existe
+  if (c._gastoId) {
+    state.gastos = state.gastos.filter(g=>g.id!==c._gastoId);
+    delete c._gastoId;
+  }
+  save(); renderCheques(); updateTopbar();
+  showToast('↩ Cheque revertido a pendiente');
 }
 
 // ========================= OBLIGACIONES =========================
@@ -2810,6 +2897,13 @@ function editarCheque(id) {
   document.getElementById('chq-monto').value   = c.monto||'';
   document.getElementById('chq-titular').value = c.titular||'';
   document.getElementById('chq-notas').value   = c.notas||'';
+  document.getElementById('chq-pago').value    = c.pago||'banco';
+  if (c.provId) document.getElementById('chq-proveedor').value = c.provId;
+  if (c.cat) {
+    const catSel = document.getElementById('chq-cat');
+    if (catSel) { catSel.value = c.cat; fillChqSubcat(); }
+    setTimeout(()=>{ const s=document.getElementById('chq-subcat'); if(s&&c.subcat) s.value=c.subcat; },50);
+  }
   document.getElementById('modal-cheque').style.display='flex';
 }
 
@@ -2911,7 +3005,10 @@ function fillSelects() {
   ['ing-local','gas-local','obl-local','trans-local'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=localOpts; });
   const cajLocal = document.getElementById('caj-local');
   if (cajLocal) cajLocal.innerHTML = `<option value="">— Seleccioná —</option>` + (state.locales.map(l=>`<option value="${l.id}">${l.tipo==='pancheria'?'🌭':'🍦'} ${l.nombre}</option>`).join(''));
-  ['ing-proveedor','gas-proveedor','obl-proveedor'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=provOpts; });
+  ['ing-proveedor','gas-proveedor','obl-proveedor','chq-proveedor'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=provOpts; });
+  // Cat selector for cheque (gastos)
+  const chqCat = document.getElementById('chq-cat');
+  if (chqCat) { chqCat.innerHTML = gasCats.map(c=>`<option value="${c.nombre}">${c.nombre}</option>`).join(''); fillChqSubcat(); }
 
   fillSubcat('ing'); fillSubcat('gas');
 }
@@ -3010,6 +3107,10 @@ function saveCheque() {
     monto:   document.getElementById('chq-monto').value,
     titular: document.getElementById('chq-titular').value,
     notas:   document.getElementById('chq-notas').value,
+    provId:  document.getElementById('chq-proveedor').value || null,
+    cat:     document.getElementById('chq-cat').value || '',
+    subcat:  document.getElementById('chq-subcat').value || '',
+    pago:    document.getElementById('chq-pago').value || 'banco',
   };
   if (!data.monto||!data.cobro) return alert('Completá monto y fecha de cobro');
   if (editId) {
@@ -3186,7 +3287,7 @@ Object.assign(window, {
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
   autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat,
   cajRecalc, renderFlujo, abrirAjusteObl, guardarAjusteObl,
-  saveTransferencia, editarTransferencia, renderTransferencias,
+  marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
 });
 </script>
 </body>
