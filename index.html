@@ -1213,9 +1213,16 @@
         <label>Monto</label>
         <input type="number" id="obl-monto" placeholder="0.00" min="0" step="0.01">
       </div>
-      <div class="form-group">
+      <div class="form-group" style="position:relative">
         <label>Proveedor</label>
-        <select id="obl-proveedor" onchange="autocompletarObligacionDesdeProveedor()"></select>
+        <input type="text" id="obl-proveedor-search"
+          placeholder="🔍 Buscar proveedor..."
+          oninput="onOblProvSearch()"
+          onfocus="showOblProvDropdown()"
+          onblur="setTimeout(hideOblProvDropdown,200)"
+          autocomplete="off" style="width:100%">
+        <div id="obl-proveedor-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;z-index:9999;margin-top:2px;box-shadow:0 8px 24px rgba(0,0,0,0.4)"></div>
+        <input type="hidden" id="obl-proveedor">
       </div>
       <div class="form-group">
         <label>Forma de Pago</label>
@@ -2597,7 +2604,14 @@ function editarObl(id) {
   document.getElementById('obl-monto').value = o.monto || '';
   document.getElementById('obl-pago').value = o.pago || 'efectivo';
   document.getElementById('obl-local').value = o.localId || '';
+  // Proveedor — fill search field
   document.getElementById('obl-proveedor').value = o.provId || '';
+  if (o.provId) {
+    const prov = state.proveedores.find(p=>p.id===o.provId);
+    if (prov) document.getElementById('obl-proveedor-search').value = prov.nombre;
+  } else {
+    document.getElementById('obl-proveedor-search').value = '';
+  }
   // Categoría y subcategoría
   const catSel = document.getElementById('obl-cat');
   if (catSel && o.cat) {
@@ -3407,6 +3421,8 @@ function openModal(id) {
     document.getElementById('obl-modal-title').textContent='Nueva Obligación';
     document.getElementById('obl-save-btn').textContent='Guardar';
     ['obl-desc','obl-dia','obl-monto'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=''; });
+    const ps=document.getElementById('obl-proveedor-search'); if(ps) ps.value='';
+    const ph=document.getElementById('obl-proveedor'); if(ph) ph.value='';
   }
   document.getElementById(id).style.display='flex';
 }
@@ -3581,7 +3597,7 @@ function fillSelects() {
   ['ing-local','gas-local','obl-local','trans-local'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=localOpts; });
   const cajLocal = document.getElementById('caj-local');
   if (cajLocal) cajLocal.innerHTML = `<option value="">— Seleccioná —</option>` + (state.locales.map(l=>`<option value="${l.id}">${l.tipo==='pancheria'?'🌭':'🍦'} ${l.nombre}</option>`).join(''));
-  ['ing-proveedor','obl-proveedor','chq-proveedor'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=provOpts; });
+  ['ing-proveedor','chq-proveedor'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=provOpts; });
   // Cat selector for cheque (gastos)
   const chqCat = document.getElementById('chq-cat');
   if (chqCat) { chqCat.innerHTML = gasCats.map(c=>`<option value="${c.nombre}">${c.nombre}</option>`).join(''); fillChqSubcat(); }
@@ -3607,7 +3623,32 @@ function fillProvSubcat() {
 }
 
 // Autocompleta categoría y subcategoría al elegir proveedor en gasto
-function showProvDropdown() {
+function showOblProvDropdown() { onOblProvSearch(); document.getElementById('obl-proveedor-dropdown').style.display='block'; }
+function hideOblProvDropdown() { const d=document.getElementById('obl-proveedor-dropdown'); if(d) d.style.display='none'; }
+function selectOblProv(id, nombre) {
+  document.getElementById('obl-proveedor-search').value = nombre;
+  document.getElementById('obl-proveedor').value = id;
+  hideOblProvDropdown();
+  autocompletarObligacionDesdeProveedor();
+}
+function onOblProvSearch() {
+  const q = (document.getElementById('obl-proveedor-search').value||'').toLowerCase().trim();
+  const dd = document.getElementById('obl-proveedor-dropdown');
+  if (!dd) return;
+  const sorted = [...state.proveedores].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  const filtered = q ? sorted.filter(p=>p.nombre.toLowerCase().includes(q)) : sorted;
+  dd.innerHTML = filtered.slice(0,60).map(p=>{
+    const hl = q ? p.nombre.replace(new RegExp('('+q+')','gi'),'<strong style="color:var(--accent)">$1</strong>') : p.nombre;
+    const cat = p.cat ? '<span style="font-size:11px;color:var(--text3)">'+p.cat+'</span>' : '';
+    return '<div onclick="selectOblProv(\''+p.id.replace(/'/g,"\\'")+'\',\''+p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\''+')" '+
+      'style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center" '+
+      'onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'">' +
+      '<span>'+hl+'</span>'+cat+'</div>';
+  }).join('') || '<div style="padding:10px;color:var(--text3);font-size:13px">Sin resultados</div>';
+  dd.style.display = 'block';
+}
+
+
   onGasProvSearch();
   document.getElementById('gas-proveedor-dropdown').style.display = 'block';
 }
@@ -3921,6 +3962,7 @@ Object.assign(window, {
   del, renderCajas, renderCategorias, renderLocales, renderObligaciones,
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv,
+  onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
   autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat,
   cajRecalc, renderFlujo, abrirAjusteObl, guardarAjusteObl,
   marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
