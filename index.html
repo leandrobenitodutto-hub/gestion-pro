@@ -1030,18 +1030,6 @@
           <option value="cheque">📄 Cheque</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>Categoría</label>
-        <select id="gas-cat" onchange="fillSubcat('gas')"></select>
-      </div>
-      <div class="form-group">
-        <label>Subcategoría</label>
-        <select id="gas-subcat"></select>
-      </div>
-      <div class="form-group">
-        <label>Local</label>
-        <select id="gas-local"></select>
-      </div>
       <div class="form-group" style="position:relative">
         <label>Proveedor</label>
         <input type="text" id="gas-proveedor-search"
@@ -1053,6 +1041,18 @@
           style="width:100%">
         <div id="gas-proveedor-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;z-index:9999;margin-top:2px;box-shadow:0 8px 24px rgba(0,0,0,0.4)"></div>
         <input type="hidden" id="gas-proveedor">
+      </div>
+      <div class="form-group">
+        <label>Categoría</label>
+        <select id="gas-cat" onchange="fillSubcat('gas')"></select>
+      </div>
+      <div class="form-group">
+        <label>Subcategoría</label>
+        <select id="gas-subcat"></select>
+      </div>
+      <div class="form-group">
+        <label>Local</label>
+        <select id="gas-local"></select>
       </div>
       <div class="form-group full">
         <label>Descripción</label>
@@ -1873,15 +1873,24 @@ window.addEventListener('resize', checkMobile);
 
 // FAB action — abre el modal relevante según la página activa
 function fabAction() {
-  const pageEl = document.querySelector('.page.active') || document.querySelector('.page[style*="block"]') || document.querySelector('.page[style*="flex"]');
-  const page = pageEl?.id?.replace('page-','') || 'dashboard';
-  const map = {
-    ingresos: 'modal-ingreso', gastos: 'modal-gasto', cheques: 'modal-cheque',
-    obligaciones: 'modal-obligacion', cajas: 'modal-caja', proveedores: 'modal-proveedor',
-    locales: 'modal-local', categorias: 'modal-categoria',
-  };
-  const modalId = map[page] || 'modal-gasto';
-  openModal(modalId);
+  const activeId = document.querySelector('.page.active')?.id || '';
+  if (activeId === 'page-ingresos')     { openModal('modal-ingreso');     return; }
+  if (activeId === 'page-gastos')       { openModal('modal-gasto');        return; }
+  if (activeId === 'page-cheques')      { openModal('modal-cheque');       return; }
+  if (activeId === 'page-obligaciones') { openModal('modal-obligacion');   return; }
+  if (activeId === 'page-cajas')        { openModal('modal-caja');         return; }
+  if (activeId === 'page-proveedores')  { openModal('modal-proveedor');    return; }
+  if (activeId === 'page-locales')      { openModal('modal-local');        return; }
+  if (activeId === 'page-categorias')   { openModal('modal-categoria');    return; }
+  // Dashboard y cualquier otra página → abrir gasto
+  fillSelects();
+  document.getElementById('gas-fecha').value = today();
+  document.getElementById('gas-id').value = '';
+  document.getElementById('gas-monto').value = '';
+  document.getElementById('gas-desc').value = '';
+  const ps = document.getElementById('gas-proveedor-search'); if(ps) ps.value='';
+  const ph = document.getElementById('gas-proveedor'); if(ph) ph.value='';
+  document.getElementById('modal-gasto').style.display = 'flex';
 }
 
 // Bottom nav active state
