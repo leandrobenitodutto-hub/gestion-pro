@@ -1037,9 +1037,17 @@
         <label>Local</label>
         <select id="gas-local"></select>
       </div>
-      <div class="form-group">
+      <div class="form-group" style="position:relative">
         <label>Proveedor</label>
-        <select id="gas-proveedor" onchange="autocompletarDesdeProveedor()"></select>
+        <input type="text" id="gas-proveedor-search"
+          placeholder="🔍 Buscar proveedor..."
+          oninput="onGasProvSearch()"
+          onfocus="showProvDropdown()"
+          onblur="setTimeout(hideProvDropdown,200)"
+          autocomplete="off"
+          style="width:100%">
+        <div id="gas-proveedor-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;z-index:9999;margin-top:2px;box-shadow:0 8px 24px rgba(0,0,0,0.4)"></div>
+        <input type="hidden" id="gas-proveedor">
       </div>
       <div class="form-group full">
         <label>Descripción</label>
@@ -2314,16 +2322,18 @@ function generarInstancias() {
     }
   });
 
-  // Semanales — 1 instancia por semana del mes
+  // Semanales — 1 instancia por lunes del mes
   const diasMes = new Date(y, m, 0).getDate();
-  const pad = n=>String(n).padStart(2,'0');
+  const padG = function(n){return String(n).padStart(2,'0');};
   let semNum = 0;
-  for (let s=0; s<5; s++) {
-    const desde = s*7+1;
-    if (desde > diasMes) break;
-    const hasta = Math.min(desde+6, diasMes);
+  for (let dia=1; dia<=diasMes; dia++) {
+    const diaSem = new Date(y, m-1, dia).getDay();
+    if (diaSem !== 1) continue; // solo lunes
     semNum++;
-    const semLabel = `Sem ${semNum} (${pad(desde)}/${pad(m)}-${pad(hasta)}/${pad(m)})`;
+    const desde = dia;
+    const hasta = Math.min(dia+6, diasMes);
+    const semLabel = 'Sem '+semNum+' ('+padG(desde)+'/'+padG(m)+'-'+padG(hasta)+'/'+padG(m)+')';
+    // El semLabel siempre muestra hasta el fin del mes o fin de semana dentro del mes
     state.obligaciones.filter(o=>o.freq==='semanal').forEach(o=>{
       const key = o.id+'|'+semLabel;
       if (!oblIds.has(key)) {
@@ -2649,39 +2659,47 @@ function renderFlujo() {
   resEl.style.color = res >= 0 ? 'var(--green)' : 'var(--red)';
   document.getElementById('flujo-cheques').textContent = fmt(chqMes);
 
-  // Semanas del mes
+  // Semanas del mes — empiezan SIEMPRE el lunes
+  // El lunes de inicio define a qué mes pertenece la semana
   const diasMes = new Date(year, month, 0).getDate();
   const semanas = [];
-  for (let s = 0; s < 5; s++) {
-    const desde = s*7+1;
-    if (desde > diasMes) break;
-    const hasta = Math.min(desde+6, diasMes);
-    const d1 = mes+'-'+pad(desde);
-    const d2 = mes+'-'+pad(hasta);
-    const semKey = mes+'-S'+(s+1);
-    const label  = 'Sem '+(s+1)+' ('+pad(desde)+'/'+pad(month)+'-'+pad(hasta)+'/'+pad(month)+')';
-    const semNum = s+1;
+  var semNum = 0;
 
-    const sVentas   = cajMes.filter(c=>c.fecha>=d1&&c.fecha<=d2).reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
-    const sOtrosIng = ingMes.filter(i=>i.fecha>=d1&&i.fecha<=d2).reduce((a,b)=>a+parseFloat(b.monto||0),0);
-    const sGas      = state.gastos.filter(g=>g.fecha>=d1&&g.fecha<=d2&&!g._oblId&&!g._chqId).reduce((a,b)=>a+parseFloat(b.monto||0),0);
-    const sOblPag   = state.gastos.filter(g=>g.fecha>=d1&&g.fecha<=d2&&g._oblId).reduce((a,b)=>a+parseFloat(b.monto||0),0);
-    const sChqPend  = state.cheques.filter(c=>c.estado==='pendiente'&&c.tipo==='emitido'&&c.cobro>=d1&&c.cobro<=d2).reduce((a,b)=>a+parseFloat(b.monto||0),0);
-    const instSem   = state.oblInstancias.filter(i=>i.periodo===mes&&i.semLabel&&i.semLabel.startsWith('Sem '+semNum+' ')&&i.estado!=='saltado');
-    const sOblPend  = instSem.length > 0
-      ? instSem.filter(i=>i.estado==='pendiente').reduce((a,b)=>a+parseFloat(b.monto||0),0)
-      : state.obligaciones.filter(o=>o.freq==='semanal').reduce((a,o)=>a+getMontoObl(o,semKey),0);
+  for (var dia = 1; dia <= diasMes; dia++) {
+    var diaSemana = new Date(year, month-1, dia).getDay(); // 0=Dom, 1=Lun
+    if (diaSemana !== 1) continue; // Solo lunes
+    semNum++;
+    // La semana va de este lunes al domingo siguiente (o fin de mes)
+    // Pero puede extenderse al mes siguiente — solo mostramos hasta fin del mes mostrado
+    var hastaNum = dia + 6;
+    var hastaFin = Math.min(hastaNum, diasMes);
+    var d1 = mes+'-'+pad(dia);
+    // d2 puede extenderse al mes siguiente — calculamos la fecha real del domingo
+    var d2Date = new Date(year, month-1, hastaNum);
+    var d2 = d2Date.getFullYear()+'-'+pad(d2Date.getMonth()+1)+'-'+pad(d2Date.getDate());
+    var semKey = mes+'-S'+semNum;
+    var label  = 'Sem '+semNum+' ('+pad(dia)+'/'+pad(month)+'-'+pad(hastaFin)+'/'+pad(month)+')';
 
-    const cajasPorLocal = {};
-    cajMes.filter(c=>c.fecha>=d1&&c.fecha<=d2).forEach(c=>{
-      const local = state.locales.find(l=>l.id===c.localId);
-      const nombre = local ? local.nombre : (c._sucursal||'Sin local');
+    var sVentas   = cajMes.filter(function(c){return c.fecha>=d1&&c.fecha<=d2;}).reduce(function(a,b){return a+parseFloat(b.totalReal||0);},0);
+    var sOtrosIng = ingMes.filter(function(i){return i.fecha>=d1&&i.fecha<=d2;}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0);
+    var sGas      = state.gastos.filter(function(g){return g.fecha>=d1&&g.fecha<=d2&&!g._oblId&&!g._chqId;}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0);
+    var sOblPag   = state.gastos.filter(function(g){return g.fecha>=d1&&g.fecha<=d2&&g._oblId;}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0);
+    var sChqPend  = state.cheques.filter(function(c){return c.estado==='pendiente'&&c.tipo==='emitido'&&c.cobro>=d1&&c.cobro<=d2;}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0);
+    var instSem   = state.oblInstancias.filter(function(i){return i.periodo===mes&&i.semLabel&&i.semLabel.startsWith('Sem '+semNum+' ')&&i.estado!=='saltado';});
+    var sOblPend  = instSem.length > 0
+      ? instSem.filter(function(i){return i.estado==='pendiente';}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0)
+      : state.obligaciones.filter(function(o){return o.freq==='semanal';}).reduce(function(a,o){return a+getMontoObl(o,semKey);},0);
+
+    var cajasPorLocal = {};
+    cajMes.filter(function(c){return c.fecha>=d1&&c.fecha<=d2;}).forEach(function(c){
+      var local = state.locales.find(function(l){return l.id===c.localId;});
+      var nombre = local ? local.nombre : (c._sucursal||'Sin local');
       cajasPorLocal[nombre] = (cajasPorLocal[nombre]||0) + parseFloat(c.totalReal||0);
     });
 
-    const chqSem = state.cheques.filter(c=>c.estado==='pendiente'&&c.tipo==='emitido'&&c.cobro>=d1&&c.cobro<=d2);
-    const gasSem = state.gastos.filter(g=>g.fecha>=d1&&g.fecha<=d2&&!g._oblId&&!g._chqId);
-    semanas.push({label, semKey, d1, d2, semNum, ing: sVentas+sOtrosIng, gasPag: sGas+sOblPag, oblPend: sOblPend, chqPend: sChqPend, cajasPorLocal, instSem, chqSem, gasSem});
+    var chqSem = state.cheques.filter(function(c){return c.estado==='pendiente'&&c.tipo==='emitido'&&c.cobro>=d1&&c.cobro<=d2;});
+    var gasSem = state.gastos.filter(function(g){return g.fecha>=d1&&g.fecha<=d2&&!g._oblId&&!g._chqId;});
+    semanas.push({label:label, semKey:semKey, d1:d1, d2:d2, semNum:semNum, ing:sVentas+sOtrosIng, gasPag:sGas+sOblPag, oblPend:sOblPend, chqPend:sChqPend, cajasPorLocal:cajasPorLocal, instSem:instSem, chqSem:chqSem, gasSem:gasSem});
   }
 
   // Build DOM nodes
@@ -3287,6 +3305,13 @@ function openModal(id) {
     const elId = document.getElementById(rid); if(elId) elId.value='';
     const elT  = document.getElementById(rtitle); if(elT)  elT.textContent=rlabel;
   }
+  // Clear gas proveedor search field
+  if (id === 'modal-gasto') {
+    const s = document.getElementById('gas-proveedor-search');
+    const h = document.getElementById('gas-proveedor');
+    if (s) s.value='';
+    if (h) h.value='';
+  }
   const dateFields = { 'modal-ingreso':'ing-fecha','modal-gasto':'gas-fecha','modal-caja':'caj-fecha','modal-cheque':'chq-emision','modal-transferencia':'trans-fecha' };
   if (dateFields[id]) document.getElementById(dateFields[id]).value = today();
   if (id === 'modal-caja') {
@@ -3326,19 +3351,28 @@ function editarMov(tipo, id) {
   const modal = tipo==='ingresos' ? 'modal-ingreso' : 'modal-gasto';
   const prefix = tipo==='ingresos' ? 'ing' : 'gas';
   fillSelects();
-  document.getElementById(`${prefix}-id`).value = id;
-  document.getElementById(`${prefix}-modal-title`).textContent = tipo==='ingresos' ? 'Editar Ingreso' : 'Editar Gasto';
-  document.getElementById(`${prefix}-fecha`).value = m.fecha||'';
-  document.getElementById(`${prefix}-monto`).value = m.monto||'';
-  document.getElementById(`${prefix}-pago`).value  = m.pago||'efectivo';
-  document.getElementById(`${prefix}-desc`).value  = m.desc||'';
-  document.getElementById(`${prefix}-local`).value = m.localId||'';
-  document.getElementById(`${prefix}-proveedor`).value = m.provId||'';
-  // Categoría y subcategoría
-  const catSel = document.getElementById(`${prefix}-cat`);
+  document.getElementById(prefix+'-id').value = id;
+  document.getElementById(prefix+'-modal-title').textContent = tipo==='ingresos' ? 'Editar Ingreso' : 'Editar Gasto';
+  document.getElementById(prefix+'-fecha').value = m.fecha||'';
+  document.getElementById(prefix+'-monto').value = m.monto||'';
+  document.getElementById(prefix+'-pago').value  = m.pago||'efectivo';
+  document.getElementById(prefix+'-desc').value  = m.desc||'';
+  document.getElementById(prefix+'-local').value = m.localId||'';
+  // Proveedor — special handling for gas (uses search+hidden)
+  if (tipo==='gastos' && m.provId) {
+    const prov = state.proveedores.find(p=>p.id===m.provId);
+    const searchEl = document.getElementById('gas-proveedor-search');
+    const hiddenEl = document.getElementById('gas-proveedor');
+    if (searchEl && prov) searchEl.value = prov.nombre;
+    if (hiddenEl) hiddenEl.value = m.provId;
+  } else {
+    const provEl = document.getElementById(prefix+'-proveedor');
+    if (provEl) provEl.value = m.provId||'';
+  }
+  const catSel = document.getElementById(prefix+'-cat');
   if(catSel && m.cat){ catSel.value=m.cat; fillSubcat(prefix); }
-  setTimeout(()=>{
-    const sub=document.getElementById(`${prefix}-subcat`); if(sub&&m.subcat) sub.value=m.subcat;
+  setTimeout(function(){
+    const sub=document.getElementById(prefix+'-subcat'); if(sub&&m.subcat) sub.value=m.subcat;
   },0);
   document.getElementById(modal).style.display='flex';
 }
@@ -3465,7 +3499,7 @@ function fillSelects() {
   ['ing-local','gas-local','obl-local','trans-local'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=localOpts; });
   const cajLocal = document.getElementById('caj-local');
   if (cajLocal) cajLocal.innerHTML = `<option value="">— Seleccioná —</option>` + (state.locales.map(l=>`<option value="${l.id}">${l.tipo==='pancheria'?'🌭':'🍦'} ${l.nombre}</option>`).join(''));
-  ['ing-proveedor','gas-proveedor','obl-proveedor','chq-proveedor'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=provOpts; });
+  ['ing-proveedor','obl-proveedor','chq-proveedor'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=provOpts; });
   // Cat selector for cheque (gastos)
   const chqCat = document.getElementById('chq-cat');
   if (chqCat) { chqCat.innerHTML = gasCats.map(c=>`<option value="${c.nombre}">${c.nombre}</option>`).join(''); fillChqSubcat(); }
@@ -3491,7 +3525,48 @@ function fillProvSubcat() {
 }
 
 // Autocompleta categoría y subcategoría al elegir proveedor en gasto
-function autocompletarDesdeProveedor() {
+function showProvDropdown() {
+  onGasProvSearch();
+  document.getElementById('gas-proveedor-dropdown').style.display = 'block';
+}
+function hideProvDropdown() {
+  const dd = document.getElementById('gas-proveedor-dropdown');
+  if (dd) dd.style.display = 'none';
+}
+function selectGasProv(provId, nombre) {
+  document.getElementById('gas-proveedor-search').value = nombre;
+  document.getElementById('gas-proveedor').value = provId;
+  hideProvDropdown();
+  autocompletarDesdeProveedor();
+}
+function onGasProvSearch() {
+  const q = (document.getElementById('gas-proveedor-search').value||'').toLowerCase().trim();
+  const dd = document.getElementById('gas-proveedor-dropdown');
+  if (!dd) return;
+  const sorted = [...state.proveedores].sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
+  const filtered = q ? sorted.filter(function(p){return p.nombre.toLowerCase().includes(q);}) : sorted;
+  if (!filtered.length) {
+    dd.innerHTML = '<div style="padding:10px;color:var(--text3);font-size:13px">Sin resultados</div>';
+  } else {
+    dd.innerHTML = filtered.slice(0,60).map(function(p) {
+      var hl = q ? p.nombre.replace(new RegExp('('+q+')', 'gi'), '<strong style="color:var(--accent)">$1</strong>') : p.nombre;
+      var cat = p.cat ? '<span style="font-size:11px;color:var(--text3)">'+p.cat+'</span>' : '';
+      return '<div onclick="selectGasProv(\''+p.id.replace(/'/g,"\\'")+'\',' +
+        '\''+p.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\''+')" ' +
+        'style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center" ' +
+        'onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'">' +
+        '<span>'+hl+'</span>'+cat+'</div>';
+    }).join('');
+  }
+  dd.style.display = 'block';
+  // Clear hidden id if typing something that doesn't match
+  const curProv = state.proveedores.find(function(p){return p.id===document.getElementById('gas-proveedor').value;});
+  if (!curProv || curProv.nombre.toLowerCase() !== (document.getElementById('gas-proveedor-search').value||'').toLowerCase()) {
+    document.getElementById('gas-proveedor').value = '';
+  }
+}
+
+
   const provId = document.getElementById('gas-proveedor')?.value;
   if (!provId) return;
   const prov = state.proveedores.find(p=>p.id===provId);
@@ -3761,6 +3836,7 @@ Object.assign(window, {
   openModalCat, openModalSubcat,
   del, renderCajas, renderCategorias, renderLocales, renderObligaciones,
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
+  onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv,
   autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat,
   cajRecalc, renderFlujo, abrirAjusteObl, guardarAjusteObl,
   marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
