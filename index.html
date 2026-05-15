@@ -1585,10 +1585,15 @@
         <div id="edit-inst-nombre" style="font-weight:600;font-size:14px;padding:6px 0"></div>
         <div id="edit-inst-monto-base" style="font-size:11px;color:var(--text3);margin-top:2px"></div>
       </div>
-      <div class="form-group full">
+      <div class="form-group">
         <label>Monto para este período</label>
         <input type="number" id="edit-inst-monto" min="0" step="0.01" placeholder="0.00">
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">Solo modifica esta instancia, no la plantilla</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Solo modifica esta instancia</div>
+      </div>
+      <div class="form-group">
+        <label>Fecha de vencimiento</label>
+        <input type="date" id="edit-inst-fecha">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Mueve la obligación a la semana correspondiente</div>
       </div>
       <div class="form-group full">
         <label>Notas (opcional)</label>
@@ -2623,23 +2628,28 @@ function editarInstancia(id) {
   document.getElementById('edit-inst-nombre').textContent = inst.oblDesc||obl.desc||'Obligación';
   document.getElementById('edit-inst-monto-base').textContent = fmt(obl.monto||0)+' (monto base plantilla)';
   document.getElementById('edit-inst-monto').value = inst.monto;
+  document.getElementById('edit-inst-fecha').value = inst.fechaVto || '';
   document.getElementById('edit-inst-notas').value = inst.notas||'';
   document.getElementById('modal-edit-instancia').style.display = 'flex';
 }
 
 function guardarEditInstancia() {
-  const id = document.getElementById('edit-inst-id').value;
+  const id    = document.getElementById('edit-inst-id').value;
   const monto = parseFloat(document.getElementById('edit-inst-monto').value);
+  const fecha = document.getElementById('edit-inst-fecha').value;
   const notas = document.getElementById('edit-inst-notas').value;
   if (!monto || monto <= 0) return alert('Ingresá un monto válido');
   const inst = state.oblInstancias.find(i=>i.id===id);
   if (!inst) return;
   inst.monto = monto;
   inst.notas = notas;
+  if (fecha) inst.fechaVto = fecha;
   save();
   closeModal('modal-edit-instancia');
+  const open = getOpenSections();
   renderFlujo();
-  showToast('✓ Monto actualizado a '+fmt(monto));
+  restoreOpenSections(open);
+  showToast('✓ Instancia actualizada');
 }
 
 function saltarInstancia(id) {
