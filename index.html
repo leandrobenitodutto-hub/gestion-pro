@@ -3567,6 +3567,7 @@ function onGasProvSearch() {
 }
 
 
+function autocompletarDesdeProveedor() {
   const provId = document.getElementById('gas-proveedor')?.value;
   if (!provId) return;
   const prov = state.proveedores.find(p=>p.id===provId);
