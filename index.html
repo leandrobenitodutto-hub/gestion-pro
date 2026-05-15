@@ -552,6 +552,10 @@
           <span class="pill" onclick="filterMovs('ingresos','efectivo',this)">💵 Efectivo</span>
           <span class="pill" onclick="filterMovs('ingresos','banco',this)">🏦 Banco</span>
         </div>
+        <div style="margin-bottom:10px">
+          <input type="text" id="search-ingresos" placeholder="🔍 Buscar por descripción, categoría, proveedor..." oninput="renderMovimientos('ingresos')"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-size:13px;box-sizing:border-box">
+        </div>
         <div class="card">
           <div class="table-wrap">
             <table>
@@ -584,6 +588,10 @@
           <span class="pill" onclick="filterMovs('gastos','efectivo',this)">💵 Efectivo</span>
           <span class="pill" onclick="filterMovs('gastos','banco',this)">🏦 Banco</span>
           <span class="pill" onclick="filterMovs('gastos','cheque',this)">📄 Cheque</span>
+        </div>
+        <div style="margin-bottom:10px">
+          <input type="text" id="search-gastos" placeholder="🔍 Buscar por descripción, proveedor, categoría..." oninput="renderMovimientos('gastos')"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-size:13px;box-sizing:border-box">
         </div>
         <div class="card">
           <div class="table-wrap">
@@ -1799,6 +1807,23 @@ function toggleSemFlujo(id) {
   if (arrow) arrow.textContent = open ? '▲' : '▼';
 }
 
+// Track which sections are open so they stay open after re-render
+function getOpenSections() {
+  const open = [];
+  document.querySelectorAll('[id^="sem-det-"], #flujo-mensuales').forEach(el=>{
+    if (el.style.display !== 'none') open.push(el.id);
+  });
+  return open;
+}
+function restoreOpenSections(ids) {
+  ids.forEach(id=>{
+    const el = document.getElementById(id);
+    const arrow = document.getElementById(id+'-arrow');
+    if (el) { el.style.display='block'; }
+    if (arrow) arrow.textContent='▲';
+  });
+}
+
 function toggleFlujoResultado() {
   const chk = document.getElementById('chk-flujo-resultado');
   const knob = document.getElementById('toggle-flujo-knob');
@@ -2149,27 +2174,43 @@ function filterMovs(tipo, val, el) {
 function renderMovimientos(tipo) {
   const data = tipo === 'ingresos' ? state.ingresos : state.gastos;
   const fil = currentFilter[tipo];
-  const filtered = fil === 'todos' ? data : data.filter(m=>m.pago===fil);
+  let filtered = fil === 'todos' ? data : data.filter(m=>m.pago===fil);
+  // Buscador
+  const q = (document.getElementById('search-'+tipo)?.value||'').toLowerCase().trim();
+  if (q) {
+    filtered = filtered.filter(m=>{
+      const prov = getProvNombre(m.provId).toLowerCase();
+      const local = getLocalNombre(m.localId).toLowerCase();
+      return (m.desc||'').toLowerCase().includes(q) ||
+             (m.cat||'').toLowerCase().includes(q) ||
+             (m.subcat||'').toLowerCase().includes(q) ||
+             prov.includes(q) || local.includes(q);
+    });
+  }
   const sorted = [...filtered].sort((a,b)=>b.fecha>a.fecha?1:-1);
   const tbody = document.getElementById('tabla-'+tipo);
   if (sorted.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">${tipo==='ingresos'?'↑':'↓'}</div><p>Sin ${tipo} registrados</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">${tipo==='ingresos'?'↑':'↓'}</div><p>${q?'Sin resultados para "'+q+'"':'Sin '+tipo+' registrados'}</p></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = sorted.map(m=>`<tr>
+  tbody.innerHTML = sorted.map(m=>{
+    // Resaltar término buscado en descripción y proveedor
+    const hl = (txt) => q && txt ? txt.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<mark style="background:#f0c04033;color:var(--accent);border-radius:2px">$1</mark>') : (txt||'-');
+    return `<tr>
     <td>${fmtDate(m.fecha)}</td>
-    <td>${m.desc||'-'}</td>
+    <td>${hl(m.desc)}</td>
     <td class="hide-mobile"><span class="badge badge-gray">${m.cat||'-'}</span></td>
     <td class="hide-mobile" style="color:var(--text3);font-size:12px">${m.subcat||'-'}</td>
     <td>${tagPago(m.pago)}</td>
     <td class="hide-mobile" style="font-size:12px">${getLocalNombre(m.localId)}</td>
-    <td class="hide-mobile" style="font-size:12px">${getProvNombre(m.provId)}</td>
+    <td class="hide-mobile" style="font-size:12px">${hl(getProvNombre(m.provId))}</td>
     <td class="mono" style="color:${tipo==='ingresos'?'var(--green)':'var(--red)'};font-weight:600">${fmt(m.monto)}</td>
     <td style="display:flex;gap:4px">
       <button class="btn btn-icon btn-sm" onclick="editarMov('${tipo}','${m.id}')">✏</button>
       <button class="btn btn-icon btn-sm" onclick="del('${tipo}','${m.id}');renderMovimientos('${tipo}')">🗑</button>
     </td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
 }
 
 // ========================= CHEQUES =========================
@@ -2979,37 +3020,7 @@ function renderFlujo() {
     detail.id = semId;
     detail.style.cssText = 'display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px';
 
-    // Locales
-    const localEntries = Object.entries(s.cajasPorLocal).sort((a,b)=>b[1]-a[1]);
-    if (localEntries.length > 0) {
-      const sec = document.createElement('div');
-      sec.style.marginBottom = '12px';
-      sec.innerHTML = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📦 Ventas por local</div>';
-      localEntries.forEach(function(e) {
-        const row = document.createElement('div');
-        row.style.cssText = 'font-size:11px;color:var(--text2)';
-        row.innerHTML = e[0] + ': <span class="mono">' + fmt(e[1]) + '</span>';
-        sec.appendChild(row);
-      });
-      // Si es semana actual, agregar la proyección abajo del desglose
-      if (s.semActual && s.ingProyectado > 0) {
-        const proy = document.createElement('div');
-        proy.style.cssText = 'font-size:11px;color:#5090e0;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)';
-        proy.innerHTML = 'Proyección semana completa: <span class="mono" style="font-weight:700">'+fmt(s.ingProyectado)+'</span> <span style="color:var(--text3)">(prom. '+s.nSems+' sem. anteriores)</span>';
-        sec.appendChild(proy);
-      }
-      detail.appendChild(sec);
-    } else if (!s.semPasada && s.ingProyectado > 0) {
-      // Semana futura sin cajas todavía — mostrar proyección
-      const sec = document.createElement('div');
-      sec.style.marginBottom = '12px';
-      sec.innerHTML = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📊 Ingresos proyectados</div>'+
-        '<div style="font-size:13px;color:#5090e0;font-weight:600">'+fmt(s.ingProyectado)+'</div>'+
-        '<div style="font-size:11px;color:var(--text3);margin-top:2px">Proyectado día a día según el mismo día de semana de las últimas semanas</div>';
-      detail.appendChild(sec);
-    }
-
-    // Instancias semanales
+    // Instancias semanales — solo las pendientes
     if (s.instSem.length > 0) {
       const sec = document.createElement('div');
       sec.style.marginBottom = '12px';
@@ -3036,7 +3047,7 @@ function renderFlujo() {
           const btnPagar = document.createElement('button');
           btnPagar.className = 'btn btn-primary btn-sm';
           btnPagar.textContent = '✓ Pagar';
-          btnPagar.onclick = (function(id) { return function() { pagarInstancia(id); renderFlujo(); }; })(inst.id);
+          btnPagar.onclick = (function(id) { return function() { var open=getOpenSections(); pagarInstancia(id); renderFlujo(); restoreOpenSections(open); }; })(inst.id);
           const btnEditar = document.createElement('button');
           btnEditar.className = 'btn btn-sm';
           btnEditar.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
@@ -3047,7 +3058,7 @@ function renderFlujo() {
           btnSaltar.className = 'btn btn-sm';
           btnSaltar.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
           btnSaltar.textContent = '⊘';
-          btnSaltar.onclick = (function(id) { return function() { saltarInstancia(id); renderFlujo(); }; })(inst.id);
+          btnSaltar.onclick = (function(id) { return function() { var open=getOpenSections(); saltarInstancia(id); renderFlujo(); restoreOpenSections(open); }; })(inst.id);
           right.appendChild(btnPagar);
           right.appendChild(btnEditar);
           right.appendChild(btnSaltar);
@@ -3060,7 +3071,7 @@ function renderFlujo() {
           btnRevertir.className = 'btn btn-sm';
           btnRevertir.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
           btnRevertir.textContent = '↩';
-          btnRevertir.onclick = (function(id) { return function() { despagarInstancia(id); renderFlujo(); }; })(inst.id);
+          btnRevertir.onclick = (function(id) { return function() { var open=getOpenSections(); despagarInstancia(id); renderFlujo(); restoreOpenSections(open); }; })(inst.id);
           right.appendChild(badge);
           right.appendChild(btnRevertir);
         }
@@ -3096,27 +3107,11 @@ function renderFlujo() {
         const btn = document.createElement('button');
         btn.className = 'btn btn-primary btn-sm';
         btn.textContent = '✓ Pagar';
-        btn.onclick = (function(id) { return function() { marcarCobrado(id); renderFlujo(); }; })(c.id);
+        btn.onclick = (function(id) { return function() { var open=getOpenSections(); marcarCobrado(id); renderFlujo(); restoreOpenSections(open); }; })(c.id);
         right.appendChild(monto);
         right.appendChild(btn);
         row.appendChild(left);
         row.appendChild(right);
-        sec.appendChild(row);
-      });
-      detail.appendChild(sec);
-    }
-
-    // Gastos manuales
-    if (s.gasSem.length > 0) {
-      const sec = document.createElement('div');
-      sec.innerHTML = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">💸 Gastos registrados</div>';
-      s.gasSem.forEach(function(g) {
-        const prov = state.proveedores.find(p=>p.id===g.provId);
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)';
-        row.innerHTML = '<div style="font-size:12px">'+(g.desc||prov&&prov.nombre||g.cat||'-')+
-          ' <span style="color:var(--text3)">'+fmtDate(g.fecha)+'</span></div>'+
-          '<span class="mono" style="color:var(--red);font-size:12px">'+fmt(g.monto)+'</span>';
         sec.appendChild(row);
       });
       detail.appendChild(sec);
@@ -3173,7 +3168,7 @@ function renderFlujo() {
         const btnPagar = document.createElement('button');
         btnPagar.className = 'btn btn-primary btn-sm';
         btnPagar.textContent = '✓ Pagar';
-        btnPagar.onclick = (function(id) { return function() { pagarInstancia(id); renderFlujo(); }; })(inst.id);
+        btnPagar.onclick = (function(id) { return function() { var open=getOpenSections(); pagarInstancia(id); renderFlujo(); restoreOpenSections(open); }; })(inst.id);
         const btnEditar = document.createElement('button');
         btnEditar.className = 'btn btn-sm';
         btnEditar.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
@@ -3184,7 +3179,7 @@ function renderFlujo() {
         btnSaltar.className = 'btn btn-sm';
         btnSaltar.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
         btnSaltar.textContent = '⊘ Saltar';
-        btnSaltar.onclick = (function(id) { return function() { saltarInstancia(id); renderFlujo(); }; })(inst.id);
+        btnSaltar.onclick = (function(id) { return function() { var open=getOpenSections(); saltarInstancia(id); renderFlujo(); restoreOpenSections(open); }; })(inst.id);
         right.appendChild(btnPagar);
         right.appendChild(btnEditar);
         right.appendChild(btnSaltar);
@@ -3197,7 +3192,7 @@ function renderFlujo() {
         btnRevertir.className = 'btn btn-sm';
         btnRevertir.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
         btnRevertir.textContent = '↩';
-        btnRevertir.onclick = (function(id) { return function() { despagarInstancia(id); renderFlujo(); }; })(inst.id);
+        btnRevertir.onclick = (function(id) { return function() { var open=getOpenSections(); despagarInstancia(id); renderFlujo(); restoreOpenSections(open); }; })(inst.id);
         right.appendChild(badge);
         right.appendChild(btnRevertir);
       }
@@ -4113,7 +4108,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 Object.assign(window, {
   navigate, openModal, closeModal, handleMenuToggle, toggleSidebar,
   undoLastAction,
-  openMobileMenu, closeMobileMenu, toggleFlujoResultado, toggleSemFlujo,
+  openMobileMenu, closeMobileMenu, toggleFlujoResultado, toggleSemFlujo, getOpenSections, restoreOpenSections,
   filterMovs, filterCheques, filterCajas: ()=>renderCajas(),
   saveIngreso, saveGasto, saveCheque, saveObligacion, saveCaja,
   saveProveedor, saveCliente, saveLocal, saveCategoria, saveSubcategoria,
