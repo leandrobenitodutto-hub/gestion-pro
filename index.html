@@ -2643,7 +2643,12 @@ function guardarEditInstancia() {
   if (!inst) return;
   inst.monto = monto;
   inst.notas = notas;
-  if (fecha) inst.fechaVto = fecha;
+  if (fecha) {
+    const oldFecha = inst.fechaVto;
+    inst.fechaVto = fecha;
+    // Si cambia la fecha, limpiar semLabel para que se reubique en la semana correcta
+    if (fecha !== oldFecha) inst.semLabel = '';
+  }
   save();
   closeModal('modal-edit-instancia');
   const open = getOpenSections();
@@ -4120,6 +4125,7 @@ Object.assign(window, {
   undoLastAction,
   openMobileMenu, closeMobileMenu, toggleFlujoResultado, toggleSemFlujo, getOpenSections, restoreOpenSections,
   filterMovs, filterCheques, filterCajas: ()=>renderCajas(),
+  renderMovimientos,
   saveIngreso, saveGasto, saveCheque, saveObligacion, saveCaja,
   saveProveedor, saveCliente, saveLocal, saveCategoria, saveSubcategoria,
   marcarCobrado, pagarObl, confirmarPagoObl, despagarObl,
