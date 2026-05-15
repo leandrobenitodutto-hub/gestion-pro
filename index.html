@@ -2590,7 +2590,7 @@ function guardarEditInstancia() {
   showToast('✓ Monto actualizado a '+fmt(monto));
 }
 
-
+function saltarInstancia(id) {
   const inst = state.oblInstancias.find(i=>i.id===id);
   if (!inst) return;
   inst.estado = 'saltado';
