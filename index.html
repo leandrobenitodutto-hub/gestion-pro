@@ -795,19 +795,11 @@
             <div class="section-sub">Proyección de ingresos y egresos</div>
           </div>
           <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2);text-transform:none;letter-spacing:0;font-weight:400">
-              <div class="toggle-wrap" onclick="toggleFlujoResultado()">
-                <input type="checkbox" id="chk-flujo-resultado" style="display:none" checked>
-                <div id="toggle-flujo" style="width:36px;height:20px;border-radius:10px;background:var(--accent);position:relative;transition:background 0.2s;cursor:pointer">
-                  <div id="toggle-flujo-knob" style="width:16px;height:16px;border-radius:50%;background:white;position:absolute;top:2px;left:18px;transition:left 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>
-                </div>
-              </div>
-              Ver Resultado y Saldo
-            </label>
             <select id="flujo-mes" onchange="renderFlujo()" style="width:auto"></select>
           </div>
         </div>
 
+        <!-- Stat cards resumen del mes -->
         <div class="grid-4" style="margin-bottom:24px">
           <div class="stat-card">
             <div class="stat-accent" style="background:var(--green)"></div>
@@ -819,7 +811,7 @@
             <div class="stat-label">Egresos del Mes</div>
             <div class="stat-value" id="flujo-total-eg">$0</div>
           </div>
-          <div class="stat-card flujo-resultado-col">
+          <div class="stat-card">
             <div class="stat-accent" style="background:var(--accent)"></div>
             <div class="stat-label">Resultado</div>
             <div class="stat-value" id="flujo-resultado">$0</div>
@@ -831,24 +823,10 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="section-header"><div class="section-title">Detalle por Semana</div></div>
-          <div class="table-wrap">
-            <table id="tabla-flujo-wrap">
-              <thead>
-                <tr>
-                  <th>Semana</th>
-                  <th class="mono">Ingresos</th>
-                  <th class="mono">Egresos</th>
-                  <th class="mono flujo-resultado-col">Resultado</th>
-                  <th class="mono flujo-resultado-col">Saldo Acum.</th>
-                </tr>
-              </thead>
-              <tbody id="tabla-flujo"></tbody>
-            </table>
-          </div>
-        </div>
+        <!-- Tarjetas semanales + mensuales (generadas por renderFlujo) -->
+        <div id="flujo-obl-proyectadas"></div>
 
+        <!-- Categorías -->
         <div class="grid-2" style="margin-top:20px">
           <div class="card">
             <div class="section-header"><div class="section-title">Ingresos por Categoría</div></div>
@@ -1740,7 +1718,7 @@ function toggleSemFlujo(id) {
   if (arrow) arrow.textContent = open ? '▲' : '▼';
 }
 
-
+function toggleFlujoResultado() {
   const chk = document.getElementById('chk-flujo-resultado');
   const knob = document.getElementById('toggle-flujo-knob');
   const track = document.getElementById('toggle-flujo');
@@ -2643,30 +2621,25 @@ function renderCajas() {
 
 // ========================= FLUJO =========================
 function renderFlujo() {
-  const sel = document.getElementById('flujo-mes');
-  const mes = sel.value || thisMonth();
+  const mes = document.getElementById('flujo-mes')?.value || thisMonth();
   const [year, month] = mes.split('-').map(Number);
+  const pad = n => String(n).padStart(2,'0');
 
-  const ingMes = state.ingresos.filter(i=>i.fecha&&i.fecha.startsWith(mes));
-  // Gastos manuales (excluir los generados automáticamente por obligaciones y cheques)
-  const gasMes = state.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mes) && !g._oblId && !g._chqId);
-  // Obligaciones pagadas este mes (instancias pagadas en este período)
-  const oblPagadasMes = state.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mes) && g._oblId);
-  // Obligaciones pendientes — instancias pendientes del período actual
+  const cajMes  = state.cajas.filter(c=>c.fecha&&c.fecha.startsWith(mes));
+  const ingMes  = state.ingresos.filter(i=>i.fecha&&i.fecha.startsWith(mes));
+  const gasMes  = state.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mes)&&!g._oblId&&!g._chqId);
+  const oblPagadasMes = state.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mes)&&g._oblId);
   const instPeriodoFlujo = state.oblInstancias.filter(i=>i.periodo===mes&&i.estado==='pendiente');
   const oblPendientesMes = instPeriodoFlujo;
-  const cajMes = state.cajas.filter(c=>c.fecha&&c.fecha.startsWith(mes));
 
-  // Ventas locales (cajas) + otros ingresos — sin doble conteo
-  const totalVentas = cajMes.reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
-  const totalOtrosIng = ingMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
-  const totalIng = totalVentas + totalOtrosIng;
-  // Egresos = gastos manuales + obligaciones pagadas este mes
-  const totalGas = gasMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
-  const totalOblPag = oblPagadasMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalVentas  = cajMes.reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
+  const totalOtrosIng= ingMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalIng     = totalVentas + totalOtrosIng;
+  const totalGasPag  = gasMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalOblPag  = oblPagadasMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const totalOblPend = instPeriodoFlujo.reduce((a,b)=>a+parseFloat(b.monto||0),0);
-  const totalEgresos = totalGas + totalOblPag;
   const chqMes = state.cheques.filter(c=>c.cobro&&c.cobro.startsWith(mes)&&c.estado==='pendiente'&&c.tipo==='emitido').reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalEgresos = totalGasPag + totalOblPag + totalOblPend;
   const totalEgresosConCheques = totalEgresos + chqMes;
 
   document.getElementById('flujo-total-ing').textContent = fmt(totalIng);
@@ -2677,197 +2650,195 @@ function renderFlujo() {
   resEl.style.color = res >= 0 ? 'var(--green)' : 'var(--red)';
   document.getElementById('flujo-cheques').textContent = fmt(chqMes);
 
-  // Tabla semanas con ajustes de montos
+  // Semanas del mes
   const diasMes = new Date(year, month, 0).getDate();
-  const pad = n => String(n).padStart(2,'0');
   const semanas = [];
   for (let s = 0; s < 5; s++) {
-    const desde = s*7 + 1;
-    const hasta = Math.min(desde+6, diasMes);
+    const desde = s*7+1;
     if (desde > diasMes) break;
-    const d1 = `${year}-${pad(month)}-${pad(desde)}`;
-    const d2 = `${year}-${pad(month)}-${pad(hasta)}`;
-    const semKey = `${mes}-S${s+1}`;
-    const sVentas   = cajMes.filter(c=>c.fecha>=d1&&c.fecha<=d2).reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
-    const sOtrosIng = ingMes.filter(i=>i.fecha>=d1&&i.fecha<=d2).reduce((a,b)=>a+parseFloat(i.monto||0),0);
-    const sGasManuales = state.gastos.filter(g=>g.fecha>=d1&&g.fecha<=d2&&!g._oblId&&!g._chqId).reduce((a,b)=>a+parseFloat(b.monto||0),0);
-    const sOblPag   = state.gastos.filter(g=>g.fecha>=d1&&g.fecha<=d2&&g._oblId).reduce((a,b)=>a+parseFloat(b.monto||0),0);
-    const sChqPend  = state.cheques.filter(c=>c.estado==='pendiente'&&c.tipo==='emitido'&&c.cobro>=d1&&c.cobro<=d2)
-                        .reduce((a,b)=>a+parseFloat(b.monto||0),0);
-    // Obligaciones semanales pendientes con ajuste por semana
-    // Obligaciones semanales: usar instancias si existen, sino estimado de plantilla
-    const instSem = state.oblInstancias.filter(i=>i.periodo===mes&&i.semLabel&&i.semLabel.includes(`Sem ${s+1}`)&&i.estado!=='saltado');
-    const sOblPend = instSem.length > 0
+    const hasta = Math.min(desde+6, diasMes);
+    const d1 = mes+'-'+pad(desde);
+    const d2 = mes+'-'+pad(hasta);
+    const semKey = mes+'-S'+(s+1);
+    const label = 'Sem '+(s+1)+' ('+pad(desde)+'/'+pad(month)+'-'+pad(hasta)+'/'+pad(month)+')';
+
+    const sVentas    = cajMes.filter(c=>c.fecha>=d1&&c.fecha<=d2).reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
+    const sOtrosIng  = ingMes.filter(i=>i.fecha>=d1&&i.fecha<=d2).reduce((a,b)=>a+parseFloat(b.monto||0),0);
+    const sGas       = state.gastos.filter(g=>g.fecha>=d1&&g.fecha<=d2&&!g._oblId&&!g._chqId).reduce((a,b)=>a+parseFloat(b.monto||0),0);
+    const sOblPag    = state.gastos.filter(g=>g.fecha>=d1&&g.fecha<=d2&&g._oblId).reduce((a,b)=>a+parseFloat(b.monto||0),0);
+    const sChqPend   = state.cheques.filter(c=>c.estado==='pendiente'&&c.tipo==='emitido'&&c.cobro>=d1&&c.cobro<=d2).reduce((a,b)=>a+parseFloat(b.monto||0),0);
+    const instSemNum = s+1;
+    const instSem    = state.oblInstancias.filter(i=>i.periodo===mes&&i.semLabel&&i.semLabel.indexOf('Sem '+instSemNum+' ')===0&&i.estado!=='saltado');
+    const sOblPend   = instSem.length > 0
       ? instSem.filter(i=>i.estado==='pendiente').reduce((a,b)=>a+parseFloat(b.monto||0),0)
       : state.obligaciones.filter(o=>o.freq==='semanal').reduce((a,o)=>a+getMontoObl(o,semKey),0);
-    // Desglose cajas por local esa semana
-    const cajSemana = cajMes.filter(c=>c.fecha>=d1&&c.fecha<=d2);
+
     const cajasPorLocal = {};
-    cajSemana.forEach(c=>{
+    cajMes.filter(c=>c.fecha>=d1&&c.fecha<=d2).forEach(c=>{
       const local = state.locales.find(l=>l.id===c.localId);
       const nombre = local ? local.nombre : (c._sucursal||'Sin local');
       cajasPorLocal[nombre] = (cajasPorLocal[nombre]||0) + parseFloat(c.totalReal||0);
     });
-    semanas.push({ label:`Sem ${s+1} (${pad(desde)}/${pad(month)}-${pad(hasta)}/${pad(month)})`, semKey, d1, d2,
-      ing: sVentas+sOtrosIng, gasPag: sGasManuales+sOblPag, oblPend: sOblPend, chqPend: sChqPend, cajasPorLocal });
-  }
-  // Para mensuales pendientes usamos la clave del mes completo
-  const oblMensPend = state.obligaciones.filter(o=>o.freq==='mensual'&&o.estado!=='pagado');
 
+    semanas.push({label, semKey, d1, d2, ing: sVentas+sOtrosIng, gasPag: sGas+sOblPag, oblPend: sOblPend, chqPend: sChqPend, cajasPorLocal, instSem});
+  }
+
+  // Render tarjetas semanales
   let acum = 0;
-  // ── TABLA SEMANAL EXPANDIBLE ──
   let flujoHtml = '';
-  semanas.forEach(s => {
+
+  semanas.forEach(function(s) {
     const totalGastos = s.gasPag + s.oblPend + s.chqPend;
     acum += s.ing - totalGastos;
     const res2 = s.ing - totalGastos;
     const semId = 'sem-det-' + s.semKey;
+    const pendCount = s.instSem.filter(function(i){ return i.estado==='pendiente'; }).length;
+    const chqSem = state.cheques.filter(function(c){ return c.estado==='pendiente' && c.tipo==='emitido' && c.cobro>=s.d1 && c.cobro<=s.d2; });
+    const gasSem = state.gastos.filter(function(g){ return g.fecha>=s.d1 && g.fecha<=s.d2 && !g._oblId && !g._chqId; });
 
-    // Instancias de esta semana
-    const instSem = state.oblInstancias.filter(i =>
-      i.periodo === mes && i.semLabel && i.semLabel.includes(`Sem ${s.label.match(/Sem (\d+)/)?.[1]}`) && i.estado !== 'saltado'
-    );
-    // Obligaciones mensuales del período
-    const instMen = state.oblInstancias.filter(i => i.periodo === mes && !i.semLabel && i.estado !== 'saltado');
-    // Cheques que vencen esta semana
-    const chqSem = state.cheques.filter(c => c.estado==='pendiente' && c.tipo==='emitido' && c.cobro>=s.d1 && c.cobro<=s.d2);
-    // Gastos pagados esta semana
-    const gasSem = state.gastos.filter(g => g.fecha>=s.d1 && g.fecha<=s.d2 && !g._oblId && !g._chqId);
-    // Locales
-    const localesStr = Object.entries(s.cajasPorLocal||{}).sort((a,b)=>b[1]-a[1])
-      .map(([n,v])=>`<div style="font-size:11px;color:var(--text2)">${n}: <span class="mono">${fmt(v)}</span></div>`).join('');
+    // Locales string
+    let localesStr = '';
+    Object.entries(s.cajasPorLocal).sort(function(a,b){ return b[1]-a[1]; }).forEach(function(entry) {
+      localesStr += '<div style="font-size:11px;color:var(--text2)">'+entry[0]+': <span class="mono">'+fmt(entry[1])+'</span></div>';
+    });
 
-    flujoHtml += `
-    <div class="card" style="margin-bottom:12px">
-      <!-- Cabecera de semana — clickeable para expandir -->
-      <div onclick="toggleSemFlujo('${semId}')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0">
-        <div>
-          <div style="font-weight:700;font-size:14px">${s.label}</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px">
-            <span style="color:var(--green)">↑ ${fmt(s.ing)}</span>
-            <span style="margin:0 8px;color:var(--border)">|</span>
-            <span style="color:var(--red)">↓ ${fmt(totalGastos)}</span>
-            <span style="margin:0 8px;color:var(--border)">|</span>
-            <span style="color:${res2>=0?'var(--green)':'var(--red)'};font-weight:700">${res2>=0?'+':''}${fmt(res2)}</span>
-            ${instSem.filter(i=>i.estado==='pendiente').length > 0
-              ? `<span style="margin-left:8px;color:var(--orange)">⚠ ${instSem.filter(i=>i.estado==='pendiente').length} pendientes</span>`
-              : instSem.length > 0 ? `<span style="margin-left:8px;color:var(--green)">✓ Todo pagado</span>` : ''}
-          </div>
-        </div>
-        <div style="font-size:18px;color:var(--text3)" id="${semId}-arrow">▼</div>
-      </div>
+    // Instancias semanales
+    let instHtml = '';
+    s.instSem.forEach(function(inst) {
+      const obl = state.obligaciones.find(function(o){ return o.id===inst.oblId; })||{};
+      const pagoTag = tagPago(inst.pago||obl.pago);
+      const montoColor = inst.estado==='pagado' ? 'var(--text3)' : 'var(--red)';
+      let btnHtml = '';
+      if (inst.estado==='pendiente') {
+        btnHtml = '<button class="btn btn-primary btn-sm" onclick="pagarInstancia(''+inst.id+'');renderFlujo()">✓ Pagar</button> '+
+                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia(''+inst.id+'');renderFlujo()">⊘</button>';
+      } else {
+        btnHtml = '<span class="badge badge-green" style="font-size:11px">✓</span> '+
+                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia(''+inst.id+'');renderFlujo()">↩</button>';
+      }
+      const pagadoInfo = inst.estado==='pagado' ? '<div style="font-size:11px;color:var(--green)">✓ '+fmt(inst.montoPagado||inst.monto)+' · '+fmtDate(inst.fechaPago)+'</div>' : '';
+      instHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'+
+        '<div>'+
+          '<div style="font-size:13px;font-weight:600">'+(inst.oblDesc||obl.desc||'-')+'</div>'+
+          '<div style="font-size:11px;color:var(--text3)">'+(obl.cat||'')+' '+pagoTag+'</div>'+
+          pagadoInfo+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<span class="mono" style="color:'+montoColor+'">'+fmt(inst.monto)+'</span>'+
+          btnHtml+
+        '</div>'+
+      '</div>';
+    });
 
-      <!-- Detalle expandible -->
-      <div id="${semId}" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+    // Cheques semanales
+    let chqHtml = '';
+    chqSem.forEach(function(c) {
+      chqHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'+
+        '<div>'+
+          '<div style="font-size:13px;font-weight:600">'+(c.titular||'Sin titular')+' — N°'+c.numero+'</div>'+
+          '<div style="font-size:11px;color:var(--text3)">Vence: '+fmtDate(c.cobro)+'</div>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<span class="mono" style="color:var(--orange)">'+fmt(c.monto)+'</span>'+
+          '<button class="btn btn-primary btn-sm" onclick="marcarCobrado(''+c.id+'');renderFlujo()">✓ Pagar</button>'+
+        '</div>'+
+      '</div>';
+    });
 
-        <!-- Ingresos por local -->
-        ${localesStr ? `<div style="margin-bottom:12px">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📦 Ventas por local</div>
-          ${localesStr}
-        </div>` : ''}
+    // Gastos manuales
+    let gasHtml = '';
+    gasSem.forEach(function(g) {
+      const prov = state.proveedores.find(function(p){ return p.id===g.provId; });
+      gasHtml += '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">'+
+        '<div style="font-size:12px">'+(g.desc||prov&&prov.nombre||g.cat||'-')+' <span style="color:var(--text3)">'+fmtDate(g.fecha)+'</span></div>'+
+        '<span class="mono" style="color:var(--red);font-size:12px">'+fmt(g.monto)+'</span>'+
+      '</div>';
+    });
 
-        <!-- Obligaciones semanales de esta semana -->
-        ${instSem.length > 0 ? `
-        <div style="margin-bottom:12px">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📆 Obligaciones semanales</div>
-          ${instSem.map(inst => {
-            const obl = state.obligaciones.find(o=>o.id===inst.oblId)||{};
-            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
-              <div>
-                <div style="font-size:13px;font-weight:600">${inst.oblDesc||obl.desc}</div>
-                <div style="font-size:11px;color:var(--text3)">${obl.cat||''}${obl.subcat?' › '+obl.subcat:''} · ${tagPago(inst.pago||obl.pago)}</div>
-                ${inst.estado==='pagado' ? `<div style="font-size:11px;color:var(--green)">✓ ${fmt(inst.montoPagado||inst.monto)} · ${fmtDate(inst.fechaPago)}</div>` : ''}
-              </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="mono" style="color:${inst.estado==='pagado'?'var(--text3)':'var(--red)'}">${fmt(inst.monto)}</span>
-                ${inst.estado==='pendiente'
-                  ? `<button class="btn btn-primary btn-sm" onclick="pagarInstancia('${inst.id}');renderFlujo()">✓ Pagar</button>
-                     <button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia('${inst.id}');renderFlujo()">⊘</button>`
-                  : `<span class="badge badge-green" style="font-size:11px">✓</span>
-                     <button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia('${inst.id}');renderFlujo()">↩</button>`}
-              </div>
-            </div>`;
-          }).join('')}
-        </div>` : `<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Sin instancias semanales — generalas desde <strong>Obligaciones</strong></div>`}
+    const pendLabel = pendCount > 0
+      ? '<span style="margin-left:8px;color:var(--orange)">⚠ '+pendCount+' pendientes</span>'
+      : (s.instSem.length > 0 ? '<span style="margin-left:8px;color:var(--green)">✓ Todo pagado</span>' : '');
 
-        <!-- Cheques que vencen esta semana -->
-        ${chqSem.length > 0 ? `
-        <div style="margin-bottom:12px">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📄 Cheques por vencer</div>
-          ${chqSem.map(c=>`
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
-              <div>
-                <div style="font-size:13px;font-weight:600">${c.titular||'Sin titular'} — N°${c.numero}</div>
-                <div style="font-size:11px;color:var(--text3)">Vence: ${fmtDate(c.cobro)}</div>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="mono" style="color:var(--orange)">${fmt(c.monto)}</span>
-                <button class="btn btn-primary btn-sm" onclick="marcarCobrado('${c.id}');renderFlujo()">✓ Pagar</button>
-              </div>
-            </div>`).join('')}
-        </div>` : ''}
+    const resColor = res2 >= 0 ? 'var(--green)' : 'var(--red)';
+    const resSign  = res2 >= 0 ? '+' : '';
 
-        <!-- Gastos manuales registrados -->
-        ${gasSem.length > 0 ? `
-        <div>
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">💸 Gastos registrados</div>
-          ${gasSem.map(g=>{
-            const prov = state.proveedores.find(p=>p.id===g.provId);
-            return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
-              <div style="font-size:12px">${g.desc||prov?.nombre||g.cat||'-'} <span style="color:var(--text3)">${fmtDate(g.fecha)}</span></div>
-              <span class="mono" style="color:var(--red);font-size:12px">${fmt(g.monto)}</span>
-            </div>`;
-          }).join('')}
-        </div>` : ''}
-      </div>
-    </div>`;
+    flujoHtml +=
+      '<div class="card" style="margin-bottom:12px">'+
+        '<div onclick="toggleSemFlujo(''+semId+'')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0">'+
+          '<div>'+
+            '<div style="font-weight:700;font-size:14px">'+s.label+'</div>'+
+            '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+
+              '<span style="color:var(--green)">↑ '+fmt(s.ing)+'</span>'+
+              '<span style="margin:0 8px;color:var(--border)">|</span>'+
+              '<span style="color:var(--red)">↓ '+fmt(totalGastos)+'</span>'+
+              '<span style="margin:0 8px;color:var(--border)">|</span>'+
+              '<span style="color:'+resColor+';font-weight:700">'+resSign+fmt(res2)+'</span>'+
+              pendLabel+
+            '</div>'+
+          '</div>'+
+          '<div style="font-size:18px;color:var(--text3)" id="'+semId+'-arrow">▼</div>'+
+        '</div>'+
+        '<div id="'+semId+'" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">'+
+          (localesStr ? '<div style="margin-bottom:12px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📦 Ventas por local</div>'+localesStr+'</div>' : '')+
+          (s.instSem.length > 0
+            ? '<div style="margin-bottom:12px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📆 Obligaciones semanales</div>'+instHtml+'</div>'
+            : '<div style="font-size:12px;color:var(--text3);margin-bottom:12px">Sin instancias — generá el período desde <strong>Obligaciones</strong></div>')+
+          (chqSem.length > 0 ? '<div style="margin-bottom:12px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📄 Cheques por vencer</div>'+chqHtml+'</div>' : '')+
+          (gasSem.length > 0 ? '<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">💸 Gastos registrados</div>'+gasHtml+'</div>' : '')+
+        '</div>'+
+      '</div>';
   });
 
-  // Obligaciones mensuales — sección separada expandible
-  const instMenMes = state.oblInstancias.filter(i => i.periodo===mes && !i.semLabel && i.estado!=='saltado');
+  // Obligaciones mensuales
+  const instMenMes = state.oblInstancias.filter(function(i){ return i.periodo===mes && !i.semLabel && i.estado!=='saltado'; });
   if (instMenMes.length > 0) {
-    const totalMenPend = instMenMes.filter(i=>i.estado==='pendiente').reduce((a,b)=>a+parseFloat(b.monto||0),0);
-    const totalMenPag = instMenMes.filter(i=>i.estado==='pagado').reduce((a,b)=>a+parseFloat(b.montoPagado||b.monto||0),0);
-    flujoHtml += `
-    <div class="card" style="margin-bottom:12px">
-      <div onclick="toggleSemFlujo('flujo-mensuales')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0">
-        <div>
-          <div style="font-weight:700;font-size:14px">📅 Obligaciones Mensuales</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:2px">
-            <span style="color:var(--red)">Total: ${fmt(totalMenPend+totalMenPag)}</span>
-            <span style="margin:0 8px;color:var(--border)">|</span>
-            <span style="color:var(--green)">Pagado: ${fmt(totalMenPag)}</span>
-            <span style="margin:0 8px;color:var(--border)">|</span>
-            <span style="color:var(--orange)">Pendiente: ${fmt(totalMenPend)}</span>
-          </div>
-        </div>
-        <div style="font-size:18px;color:var(--text3)" id="flujo-mensuales-arrow">▼</div>
-      </div>
-      <div id="flujo-mensuales" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
-        ${instMenMes.map(inst => {
-          const obl = state.obligaciones.find(o=>o.id===inst.oblId)||{};
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
-            <div>
-              <div style="font-size:13px;font-weight:600">${inst.oblDesc||obl.desc}</div>
-              <div style="font-size:11px;color:var(--text3)">${obl.cat||''}${obl.subcat?' › '+obl.subcat:''} · Día ${obl.dia||'-'} · ${tagPago(inst.pago||obl.pago)}</div>
-              ${inst.estado==='pagado' ? `<div style="font-size:11px;color:var(--green)">✓ ${fmt(inst.montoPagado||inst.monto)} · ${fmtDate(inst.fechaPago)}</div>` : ''}
-            </div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span class="mono" style="color:${inst.estado==='pagado'?'var(--text3)':'var(--red)'};font-weight:600">${fmt(inst.monto)}</span>
-              ${inst.estado==='pendiente'
-                ? `<button class="btn btn-primary btn-sm" onclick="pagarInstancia('${inst.id}');renderFlujo()">✓ Pagar</button>
-                   <button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia('${inst.id}');renderFlujo()">⊘ Saltar</button>`
-                : `<span class="badge badge-green" style="font-size:11px">✓ Pagado</span>
-                   <button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia('${inst.id}');renderFlujo()">↩</button>`}
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
+    const totalMenPend = instMenMes.filter(function(i){ return i.estado==='pendiente'; }).reduce(function(a,b){ return a+parseFloat(b.monto||0); },0);
+    const totalMenPag  = instMenMes.filter(function(i){ return i.estado==='pagado'; }).reduce(function(a,b){ return a+parseFloat(b.montoPagado||b.monto||0); },0);
+    let menHtml = '';
+    instMenMes.forEach(function(inst) {
+      const obl = state.obligaciones.find(function(o){ return o.id===inst.oblId; })||{};
+      const montoColor = inst.estado==='pagado' ? 'var(--text3)' : 'var(--red)';
+      let btnHtml = '';
+      if (inst.estado==='pendiente') {
+        btnHtml = '<button class="btn btn-primary btn-sm" onclick="pagarInstancia(''+inst.id+'');renderFlujo()">✓ Pagar</button> '+
+                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia(''+inst.id+'');renderFlujo()">⊘ Saltar</button>';
+      } else {
+        btnHtml = '<span class="badge badge-green" style="font-size:11px">✓ Pagado</span> '+
+                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia(''+inst.id+'');renderFlujo()">↩</button>';
+      }
+      const pagadoInfo = inst.estado==='pagado' ? '<div style="font-size:11px;color:var(--green)">✓ '+fmt(inst.montoPagado||inst.monto)+' · '+fmtDate(inst.fechaPago)+'</div>' : '';
+      menHtml +=
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">'+
+          '<div>'+
+            '<div style="font-size:13px;font-weight:600">'+(inst.oblDesc||obl.desc||'-')+'</div>'+
+            '<div style="font-size:11px;color:var(--text3)">'+(obl.cat||'')+' · Día '+(obl.dia||'-')+'</div>'+
+            pagadoInfo+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:8px">'+
+            '<span class="mono" style="color:'+montoColor+';font-weight:600">'+fmt(inst.monto)+'</span>'+
+            btnHtml+
+          '</div>'+
+        '</div>';
+    });
+    flujoHtml +=
+      '<div class="card" style="margin-bottom:12px">'+
+        '<div onclick="toggleSemFlujo('flujo-mensuales')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0">'+
+          '<div>'+
+            '<div style="font-weight:700;font-size:14px">📅 Obligaciones Mensuales</div>'+
+            '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+
+              '<span style="color:var(--red)">Total: '+fmt(totalMenPend+totalMenPag)+'</span>'+
+              ' | <span style="color:var(--green)">Pagado: '+fmt(totalMenPag)+'</span>'+
+              ' | <span style="color:var(--orange)">Pendiente: '+fmt(totalMenPend)+'</span>'+
+            '</div>'+
+          '</div>'+
+          '<div style="font-size:18px;color:var(--text3)" id="flujo-mensuales-arrow">▼</div>'+
+        '</div>'+
+        '<div id="flujo-mensuales" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">'+
+          menHtml+
+        '</div>'+
+      '</div>';
   } else {
-    flujoHtml += `<div class="card" style="margin-bottom:12px;padding:16px">
-      <div style="font-size:13px;color:var(--text3)">📅 Sin instancias mensuales — generalas desde <strong>Obligaciones → ⚡ Generar período</strong></div>
-    </div>`;
+    flujoHtml += '<div class="card" style="margin-bottom:12px;padding:16px"><div style="font-size:13px;color:var(--text3)">📅 Sin instancias mensuales — generá el período desde <strong>Obligaciones → ⚡ Generar período</strong></div></div>';
   }
 
   // Insertar en contenedor
@@ -2879,41 +2850,44 @@ function renderFlujo() {
   }
   secObl.innerHTML = flujoHtml;
 
-  // Categorías ingresos — Ventas Locales como categoría propia + otros ingresos
-  const catIng = { 'Ventas Locales': totalVentas };
-  ingMes.forEach(i=>{ catIng[i.cat||'Otros'] = (catIng[i.cat||'Otros']||0) + parseFloat(i.monto||0); });
-  // Quitar categorías con 0
-  Object.keys(catIng).forEach(k=>{ if (!catIng[k]) delete catIng[k]; });
-  document.getElementById('flujo-cat-ing').innerHTML = Object.entries(catIng).length === 0 ? '<div class="empty"><p>Sin datos</p></div>'
-    : Object.entries(catIng).sort((a,b)=>b[1]-a[1]).map(([cat,v])=>`
-      <div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <span style="font-size:13px">${cat}</span>
-          <span class="mono" style="font-size:12px;color:var(--green)">${fmt(v)}</span>
-        </div>
-        <div class="progress-bar"><div class="progress-fill" style="background:var(--green);width:${totalIng?Math.round(v/totalIng*100):0}%"></div></div>
-      </div>`).join('');
+  // Categorías ingresos
+  const catIng = {};
+  ingMes.forEach(function(i){ catIng[i.cat||'Sin categoría'] = (catIng[i.cat||'Sin categoría']||0) + parseFloat(i.monto||0); });
+  cajMes.forEach(function(c){ catIng['Ventas Locales'] = (catIng['Ventas Locales']||0) + parseFloat(c.totalReal||0); });
+  document.getElementById('flujo-cat-ing').innerHTML = Object.entries(catIng).length === 0
+    ? '<div class="empty"><p>Sin datos</p></div>'
+    : Object.entries(catIng).sort(function(a,b){ return b[1]-a[1]; }).map(function(entry){
+        return '<div style="margin-bottom:10px">'+
+          '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
+            '<span style="font-size:13px">'+entry[0]+'</span>'+
+            '<span class="mono" style="font-size:12px;color:var(--green)">'+fmt(entry[1])+'</span>'+
+          '</div>'+
+          '<div class="progress-bar"><div class="progress-fill" style="background:var(--green);width:'+(totalIng?Math.round(entry[1]/totalIng*100):0)+'%"></div></div>'+
+        '</div>';
+      }).join('');
 
-  // Categorías gastos — incluye gastos manuales + obligaciones pagadas + cheques pendientes del mes
+  // Categorías gastos
   const catGas = {};
-  gasMes.forEach(g=>{ if(!g._chqId) catGas[g.cat||'Sin categoría'] = (catGas[g.cat||'Sin categoría']||0) + parseFloat(g.monto||0); });
-  oblPagadasMes.forEach(g=>{ catGas[g.cat||'Obligaciones'] = (catGas[g.cat||'Obligaciones']||0) + parseFloat(g.monto||0); });
-  // Cheques pendientes del mes como proyección
-  state.cheques.filter(c=>c.cobro&&c.cobro.startsWith(mes)&&c.estado==='pendiente'&&c.tipo==='emitido')
-    .forEach(c=>{ catGas[c.cat||'Cheques Pendientes'] = (catGas[c.cat||'Cheques Pendientes']||0) + parseFloat(c.monto||0); });
-  document.getElementById('flujo-cat-gas').innerHTML = Object.entries(catGas).length === 0 ? '<div class="empty"><p>Sin datos</p></div>'
-    : Object.entries(catGas).sort((a,b)=>b[1]-a[1]).map(([cat,v])=>`
-      <div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <span style="font-size:13px">${cat}</span>
-          <span class="mono" style="font-size:12px;color:var(--red)">${fmt(v)}</span>
-        </div>
-        <div class="progress-bar"><div class="progress-fill" style="background:var(--red);width:${totalEgresosConCheques?Math.round(v/totalEgresosConCheques*100):0}%"></div></div>
-      </div>`).join('');
-  // Desglose cajas por local — sección aparte en ingresos
+  gasMes.forEach(function(g){ if(!g._chqId) catGas[g.cat||'Sin categoría'] = (catGas[g.cat||'Sin categoría']||0) + parseFloat(g.monto||0); });
+  oblPagadasMes.forEach(function(g){ catGas[g.cat||'Obligaciones'] = (catGas[g.cat||'Obligaciones']||0) + parseFloat(g.monto||0); });
+  state.cheques.filter(function(c){ return c.cobro&&c.cobro.startsWith(mes)&&c.estado==='pendiente'&&c.tipo==='emitido'; })
+    .forEach(function(c){ catGas[c.cat||'Cheques Pendientes'] = (catGas[c.cat||'Cheques Pendientes']||0) + parseFloat(c.monto||0); });
+  document.getElementById('flujo-cat-gas').innerHTML = Object.entries(catGas).length === 0
+    ? '<div class="empty"><p>Sin datos</p></div>'
+    : Object.entries(catGas).sort(function(a,b){ return b[1]-a[1]; }).map(function(entry){
+        return '<div style="margin-bottom:10px">'+
+          '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
+            '<span style="font-size:13px">'+entry[0]+'</span>'+
+            '<span class="mono" style="font-size:12px;color:var(--red)">'+fmt(entry[1])+'</span>'+
+          '</div>'+
+          '<div class="progress-bar"><div class="progress-fill" style="background:var(--red);width:'+(totalEgresosConCheques?Math.round(entry[1]/totalEgresosConCheques*100):0)+'%"></div></div>'+
+        '</div>';
+      }).join('');
+
+  // Desglose locales
   const cajasPorLocalMes = {};
-  cajMes.forEach(c=>{
-    const local = state.locales.find(l=>l.id===c.localId);
+  cajMes.forEach(function(c){
+    const local = state.locales.find(function(l){ return l.id===c.localId; });
     const nombre = local ? local.nombre : (c._sucursal||'Sin local');
     cajasPorLocalMes[nombre] = (cajasPorLocalMes[nombre]||0) + parseFloat(c.totalReal||0);
   });
@@ -2921,18 +2895,19 @@ function renderFlujo() {
   if (flujoLocalesEl) {
     flujoLocalesEl.innerHTML = Object.entries(cajasPorLocalMes).length === 0
       ? '<div class="empty"><p>Sin datos de cajas</p></div>'
-      : Object.entries(cajasPorLocalMes).sort((a,b)=>b[1]-a[1]).map(([nombre,v])=>`
-        <div style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <span style="font-size:13px">${nombre}</span>
-            <span class="mono" style="font-size:12px;color:var(--green)">${fmt(v)}</span>
-          </div>
-          <div class="progress-bar"><div class="progress-fill" style="background:var(--green);width:${totalVentas?Math.round(v/totalVentas*100):0}%"></div></div>
-        </div>`).join('');
+      : Object.entries(cajasPorLocalMes).sort(function(a,b){ return b[1]-a[1]; }).map(function(entry){
+          return '<div style="margin-bottom:10px">'+
+            '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
+              '<span style="font-size:13px">'+entry[0]+'</span>'+
+              '<span class="mono" style="font-size:12px;color:var(--green)">'+fmt(entry[1])+'</span>'+
+            '</div>'+
+            '<div class="progress-bar"><div class="progress-fill" style="background:var(--green);width:'+(totalVentas?Math.round(entry[1]/totalVentas*100):0)+'%"></div></div>'+
+          '</div>';
+        }).join('');
   }
 }
 
-// ========================= CLIENTES =========================
+
 function getClienteNombre(id) {
   const c = state.clientes.find(x=>x.id===id); return c ? c.nombre : '-';
 }
