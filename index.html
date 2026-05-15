@@ -1873,15 +1873,15 @@ window.addEventListener('resize', checkMobile);
 
 // FAB action — abre el modal relevante según la página activa
 function fabAction() {
-  const page = document.querySelector('.page.active')?.id?.replace('page-','');
+  const pageEl = document.querySelector('.page.active') || document.querySelector('.page[style*="block"]') || document.querySelector('.page[style*="flex"]');
+  const page = pageEl?.id?.replace('page-','') || 'dashboard';
   const map = {
     ingresos: 'modal-ingreso', gastos: 'modal-gasto', cheques: 'modal-cheque',
     obligaciones: 'modal-obligacion', cajas: 'modal-caja', proveedores: 'modal-proveedor',
     locales: 'modal-local', categorias: 'modal-categoria',
   };
-  const modalId = map[page];
-  if (modalId) openModal(modalId);
-  else openModal('modal-gasto'); // desde cualquier página sin modal propio abre nuevo gasto
+  const modalId = map[page] || 'modal-gasto';
+  openModal(modalId);
 }
 
 // Bottom nav active state
@@ -3474,10 +3474,12 @@ function openModal(id) {
   }
   // Clear gas proveedor search field
   if (id === 'modal-gasto') {
+    fillSelects();
     const s = document.getElementById('gas-proveedor-search');
     const h = document.getElementById('gas-proveedor');
     if (s) s.value='';
     if (h) h.value='';
+    document.getElementById('gas-id') && (document.getElementById('gas-id').value='');
   }
   const dateFields = { 'modal-ingreso':'ing-fecha','modal-gasto':'gas-fecha','modal-caja':'caj-fecha','modal-cheque':'chq-emision','modal-transferencia':'trans-fecha' };
   if (dateFields[id]) document.getElementById(dateFields[id]).value = today();
