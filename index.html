@@ -428,6 +428,10 @@
       <div class="topbar-right">
         <span class="badge-caja">💵 <span id="top-caja">$0</span></span>
         <span class="badge-banco">🏦 <span id="top-banco">$0</span></span>
+        <button id="btn-undo" onclick="undoLastAction()" title="Deshacer última acción"
+          style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text2);padding:5px 10px;cursor:pointer;font-size:15px;opacity:0.35;transition:opacity 0.2s">
+          ↩
+        </button>
         <span style="font-size:12px;color:var(--text3);" id="top-fecha"></span>
       </div>
     </div>
@@ -649,6 +653,7 @@
           <span class="pill" onclick="filterCheques('pendiente',this)">Pendientes</span>
           <span class="pill" onclick="filterCheques('cobrado',this)">Cobrados</span>
         </div>
+        <div class="card" style="margin-bottom:12px" id="chq-stat-total"></div>
         <div class="card">
           <div class="table-wrap">
             <table>
@@ -1667,8 +1672,39 @@ async function loadFromFirebase() {
 }
 
 let saveTimeout = null;
-function save() {
-  // Debounce: espera 800ms después del último cambio para guardar
+// ── UNDO STACK ──────────────────────────────────
+const undoStack = [];
+function snapshotForUndo() {
+  undoStack.push(JSON.stringify(state));
+  if (undoStack.length > 10) undoStack.shift();
+  updateUndoBtn();
+}
+function updateUndoBtn() {
+  const btn = document.getElementById('btn-undo');
+  if (btn) btn.style.opacity = undoStack.length > 0 ? '1' : '0.35';
+}
+function undoLastAction() {
+  if (!undoStack.length) return showToast('Sin acciones para deshacer');
+  const prev = JSON.parse(undoStack.pop());
+  Object.assign(state, prev);
+  updateUndoBtn();
+  save(true);
+  // Re-render página activa
+  const pid = document.querySelector('.page[style*="flex"], .page[style*="block"]')?.id || '';
+  ({
+    'page-dashboard': renderDashboard,
+    'page-ingresos': renderMovimientos, 'page-gastos': renderMovimientos,
+    'page-cheques': renderCheques, 'page-obligaciones': renderObligaciones,
+    'page-flujo': renderFlujo, 'page-cajas': renderCajas,
+    'page-proveedores': renderProveedores, 'page-clientes': renderClientes,
+    'page-categorias': renderCategorias,
+  }[pid] || (()=>{}))();
+  updateTopbar();
+  showToast('↩ Acción deshecha');
+}
+
+function save(skipSnapshot) {
+  if (!skipSnapshot) snapshotForUndo();
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(async () => {
     try {
@@ -2103,9 +2139,26 @@ function filterCheques(val, el) {
 function renderCheques() {
   let data = [...state.cheques].sort((a,b)=>a.cobro>b.cobro?1:-1);
   if (chqFilter !== 'todos') data = data.filter(c=>c.tipo===chqFilter||c.estado===chqFilter);
-  const tbody = document.getElementById('tabla-cheques');
-  if (data.length === 0) { tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">📄</div><p>Sin cheques</p></div></td></tr>`; return; }
+  // Actualizar tarjeta de totales
+  const totalMonto = data.reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const hoy = today();
+  const vencidos = data.filter(c=>c.estado==='pendiente'&&c.cobro<hoy).length;
+  const statEl = document.getElementById('chq-stat-total');
+  if (statEl) {
+    statEl.innerHTML =
+      '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:12px 0">' +
+        '<div><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px">'+
+          (chqFilter==='todos'?'Total cheques':chqFilter==='pendiente'?'Total pendientes':chqFilter==='cobrado'?'Total cobrados':'Total')+
+        '</div>'+
+        '<div class="mono" style="font-size:22px;font-weight:700;color:var(--accent)">'+fmt(totalMonto)+'</div></div>' +
+        '<div><div style="font-size:11px;color:var(--text3)">Cantidad</div>'+
+        '<div style="font-size:18px;font-weight:700">'+data.length+'</div></div>' +
+        (vencidos>0?'<div><div style="font-size:11px;color:var(--red)">Vencidos</div>'+
+        '<div style="font-size:18px;font-weight:700;color:var(--red)">'+vencidos+'</div></div>':'')+
+      '</div>';
+  }
+  const tbody = document.getElementById('tabla-cheques');
+  if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><p>Sin cheques</p></div></td></tr>'; return; }
   tbody.innerHTML = data.map(c=>{
     const vencido = c.estado==='pendiente' && c.cobro < hoy;
     const est = vencido ? 'vencido' : c.estado;
@@ -2160,25 +2213,24 @@ function marcarCobrado(id) {
   const c = state.cheques.find(x=>x.id===id);
   if (!c) return;
   c.estado = 'cobrado';
-  // Generar gasto automático si tiene proveedor y categoría
-  if (c.provId && c.cat) {
-    const gastoId = uid();
-    state.gastos.push({
-      id: gastoId,
-      fecha: c.cobro || today(),
-      monto: c.monto,
-      pago: c.pago || 'banco',
-      cat: c.cat,
-      subcat: c.subcat || '',
-      provId: c.provId,
-      localId: null,
-      desc: `Cheque N°${c.numero}`,
-      _chqId: id, // referencia para poder revertir
-    });
-    c._gastoId = gastoId;
-  }
+  // Siempre generar gasto automático al cobrar un cheque emitido
+  const gastoId = uid();
+  const prov = state.proveedores.find(p=>p.id===c.provId);
+  state.gastos.push({
+    id: gastoId,
+    fecha: c.cobro || today(),
+    monto: parseFloat(c.monto||0),
+    pago: c.pago || 'banco',
+    cat: c.cat || (prov&&prov.cat) || 'Cheques',
+    subcat: c.subcat || '',
+    provId: c.provId || null,
+    localId: null,
+    desc: 'Cheque N°'+c.numero+(c.titular?' — '+c.titular:''),
+    _chqId: id,
+  });
+  c._gastoId = gastoId;
   save(); renderCheques(); updateTopbar();
-  showToast('✓ Cheque marcado como cobrado' + (c.provId && c.cat ? ' — gasto generado' : ''));
+  showToast('✓ Cheque N°'+c.numero+' pagado — gasto generado en banco');
 }
 
 function desmarcarCobrado(id) {
@@ -2308,15 +2360,34 @@ function generarInstancias() {
   let nuevas = 0;
   const oblIds = new Set(yaExisten.map(i=>i.oblId+'|'+(i.semLabel||'')));
 
-  // Mensuales — 1 instancia por obligación
+  // Mensuales — 1 instancia por obligación, con fecha de vencimiento calculada
+  const diasMesMen = new Date(y, m, 0).getDate();
   state.obligaciones.filter(o=>o.freq==='mensual').forEach(o=>{
     const key = o.id+'|';
     if (!oblIds.has(key)) {
+      // Calcular fecha de vencimiento: dia de pago de la obligación en este período
+      const dia = Math.min(parseInt(o.dia)||1, diasMesMen);
+      const padM = function(n){return String(n).padStart(2,'0');};
+      const fechaVto = periodo+'-'+padM(dia);
+      // Calcular semLabel: a qué semana pertenece ese día
+      let semNumMen = 0;
+      let semLabelMen = '';
+      for (let d=1; d<=diasMesMen; d++) {
+        if (new Date(y, m-1, d).getDay() === 1) {
+          semNumMen++;
+          const hastaD = Math.min(d+6, diasMesMen);
+          if (dia >= d && dia <= d+6) {
+            semLabelMen = 'Sem '+semNumMen+' ('+padM(d)+'/'+padM(m)+'-'+padM(hastaD)+'/'+padM(m)+')';
+            break;
+          }
+        }
+      }
       state.oblInstancias.push({
         id: uid(), oblId: o.id, oblDesc: o.desc,
         periodo, monto: parseFloat(o.monto||0),
         pago: o.pago||'efectivo', localId: o.localId||null,
-        estado: 'pendiente', semLabel: '',
+        estado: 'pendiente', semLabel: semLabelMen,
+        fechaVto: fechaVto,
       });
       nuevas++;
     }
@@ -3825,6 +3896,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 // Exponer todas las funciones al scope global (requerido por type="module")
 Object.assign(window, {
   navigate, openModal, closeModal, handleMenuToggle, toggleSidebar,
+  undoLastAction,
   openMobileMenu, closeMobileMenu, toggleFlujoResultado, toggleSemFlujo,
   filterMovs, filterCheques, filterCajas: ()=>renderCajas(),
   saveIngreso, saveGasto, saveCheque, saveObligacion, saveCaja,
