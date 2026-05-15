@@ -1564,7 +1564,35 @@
 </div>
 
 <!-- MODAL CONFIRMAR PAGO OBLIGACIÓN -->
-<div class="modal-overlay" id="modal-pagar-obl" style="display:none">
+<div class="modal-overlay" id="modal-edit-instancia" style="display:none">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>✏ Editar Instancia</h3>
+      <button class="btn-icon" onclick="closeModal('modal-edit-instancia')">✕</button>
+    </div>
+    <input type="hidden" id="edit-inst-id">
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Obligación</label>
+        <div id="edit-inst-nombre" style="font-weight:600;font-size:14px;padding:6px 0"></div>
+        <div id="edit-inst-monto-base" style="font-size:11px;color:var(--text3);margin-top:2px"></div>
+      </div>
+      <div class="form-group full">
+        <label>Monto para este período</label>
+        <input type="number" id="edit-inst-monto" min="0" step="0.01" placeholder="0.00">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Solo modifica esta instancia, no la plantilla</div>
+      </div>
+      <div class="form-group full">
+        <label>Notas (opcional)</label>
+        <textarea id="edit-inst-notas" placeholder="Ej: precio actualizado por el proveedor..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-edit-instancia')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEditInstancia()">Guardar Cambio</button>
+    </div>
+  </div>
+</div>
   <div class="modal" style="max-width:400px">
     <div class="modal-header">
       <h3>Confirmar Pago</h3>
@@ -1851,7 +1879,7 @@ function fabAction() {
   };
   const modalId = map[page];
   if (modalId) openModal(modalId);
-  else navigate('cajas'); // desde dashboard el FAB va a cargar caja
+  else openModal('modal-gasto'); // desde cualquier página sin modal propio abre nuevo gasto
 }
 
 // Bottom nav active state
@@ -2535,7 +2563,34 @@ function verHistorialObl(oblId) {
   overlay.style.display = 'flex';
 }
 
-function saltarInstancia(id) {
+function editarInstancia(id) {
+  const inst = state.oblInstancias.find(i=>i.id===id);
+  if (!inst) return;
+  const obl = state.obligaciones.find(o=>o.id===inst.oblId)||{};
+  document.getElementById('edit-inst-id').value = id;
+  document.getElementById('edit-inst-nombre').textContent = inst.oblDesc||obl.desc||'Obligación';
+  document.getElementById('edit-inst-monto-base').textContent = fmt(obl.monto||0)+' (monto base plantilla)';
+  document.getElementById('edit-inst-monto').value = inst.monto;
+  document.getElementById('edit-inst-notas').value = inst.notas||'';
+  document.getElementById('modal-edit-instancia').style.display = 'flex';
+}
+
+function guardarEditInstancia() {
+  const id = document.getElementById('edit-inst-id').value;
+  const monto = parseFloat(document.getElementById('edit-inst-monto').value);
+  const notas = document.getElementById('edit-inst-notas').value;
+  if (!monto || monto <= 0) return alert('Ingresá un monto válido');
+  const inst = state.oblInstancias.find(i=>i.id===id);
+  if (!inst) return;
+  inst.monto = monto;
+  inst.notas = notas;
+  save();
+  closeModal('modal-edit-instancia');
+  renderFlujo();
+  showToast('✓ Monto actualizado a '+fmt(monto));
+}
+
+
   const inst = state.oblInstancias.find(i=>i.id===id);
   if (!inst) return;
   inst.estado = 'saltado';
@@ -2889,12 +2944,19 @@ function renderFlujo() {
           btnPagar.className = 'btn btn-primary btn-sm';
           btnPagar.textContent = '✓ Pagar';
           btnPagar.onclick = (function(id) { return function() { pagarInstancia(id); renderFlujo(); }; })(inst.id);
+          const btnEditar = document.createElement('button');
+          btnEditar.className = 'btn btn-sm';
+          btnEditar.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
+          btnEditar.textContent = '✏';
+          btnEditar.title = 'Editar monto de esta instancia';
+          btnEditar.onclick = (function(id) { return function() { editarInstancia(id); }; })(inst.id);
           const btnSaltar = document.createElement('button');
           btnSaltar.className = 'btn btn-sm';
           btnSaltar.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
           btnSaltar.textContent = '⊘';
           btnSaltar.onclick = (function(id) { return function() { saltarInstancia(id); renderFlujo(); }; })(inst.id);
           right.appendChild(btnPagar);
+          right.appendChild(btnEditar);
           right.appendChild(btnSaltar);
         } else {
           const badge = document.createElement('span');
@@ -3019,12 +3081,19 @@ function renderFlujo() {
         btnPagar.className = 'btn btn-primary btn-sm';
         btnPagar.textContent = '✓ Pagar';
         btnPagar.onclick = (function(id) { return function() { pagarInstancia(id); renderFlujo(); }; })(inst.id);
+        const btnEditar = document.createElement('button');
+        btnEditar.className = 'btn btn-sm';
+        btnEditar.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
+        btnEditar.textContent = '✏';
+        btnEditar.title = 'Editar monto de esta instancia';
+        btnEditar.onclick = (function(id) { return function() { editarInstancia(id); }; })(inst.id);
         const btnSaltar = document.createElement('button');
         btnSaltar.className = 'btn btn-sm';
         btnSaltar.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
         btnSaltar.textContent = '⊘ Saltar';
         btnSaltar.onclick = (function(id) { return function() { saltarInstancia(id); renderFlujo(); }; })(inst.id);
         right.appendChild(btnPagar);
+        right.appendChild(btnEditar);
         right.appendChild(btnSaltar);
       } else {
         const badge = document.createElement('span');
@@ -3955,6 +4024,7 @@ Object.assign(window, {
   saveProveedor, saveCliente, saveLocal, saveCategoria, saveSubcategoria,
   marcarCobrado, pagarObl, confirmarPagoObl, despagarObl,
   pagarInstancia, despagarInstancia, saltarInstancia, reactivarInstancia, generarInstancias, verHistorialObl,
+  editarInstancia, guardarEditInstancia,
   editarMov, editarCheque, editarCaja, editarProveedor, editarCliente,
   editarLocal, editarCat, editarObl, editarSubcat,
   eliminarCat, eliminarSubcat,
