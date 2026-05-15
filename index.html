@@ -2710,11 +2710,11 @@ function renderFlujo() {
       const montoColor = inst.estado==='pagado' ? 'var(--text3)' : 'var(--red)';
       let btnHtml = '';
       if (inst.estado==='pendiente') {
-        btnHtml = '<button class="btn btn-primary btn-sm" onclick="pagarInstancia(''+inst.id+'');renderFlujo()">✓ Pagar</button> '+
-                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia(''+inst.id+'');renderFlujo()">⊘</button>';
+        btnHtml = '<button class="btn btn-primary btn-sm" onclick="pagarInstancia('"+inst.id+"');renderFlujo()">✓ Pagar</button> '+
+                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia('"+inst.id+"');renderFlujo()">⊘</button>';
       } else {
         btnHtml = '<span class="badge badge-green" style="font-size:11px">✓</span> '+
-                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia(''+inst.id+'');renderFlujo()">↩</button>';
+                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia('"+inst.id+"');renderFlujo()">↩</button>';
       }
       const pagadoInfo = inst.estado==='pagado' ? '<div style="font-size:11px;color:var(--green)">✓ '+fmt(inst.montoPagado||inst.monto)+' · '+fmtDate(inst.fechaPago)+'</div>' : '';
       instHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'+
@@ -2740,7 +2740,7 @@ function renderFlujo() {
         '</div>'+
         '<div style="display:flex;align-items:center;gap:8px">'+
           '<span class="mono" style="color:var(--orange)">'+fmt(c.monto)+'</span>'+
-          '<button class="btn btn-primary btn-sm" onclick="marcarCobrado(''+c.id+'');renderFlujo()">✓ Pagar</button>'+
+          '<button class="btn btn-primary btn-sm" onclick="marcarCobrado('"+c.id+"');renderFlujo()">✓ Pagar</button>'+
         '</div>'+
       '</div>';
     });
@@ -2800,11 +2800,11 @@ function renderFlujo() {
       const montoColor = inst.estado==='pagado' ? 'var(--text3)' : 'var(--red)';
       let btnHtml = '';
       if (inst.estado==='pendiente') {
-        btnHtml = '<button class="btn btn-primary btn-sm" onclick="pagarInstancia(''+inst.id+'');renderFlujo()">✓ Pagar</button> '+
-                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia(''+inst.id+'');renderFlujo()">⊘ Saltar</button>';
+        btnHtml = '<button class="btn btn-primary btn-sm" onclick="pagarInstancia('"+inst.id+"');renderFlujo()">✓ Pagar</button> '+
+                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia('"+inst.id+"');renderFlujo()">⊘ Saltar</button>';
       } else {
         btnHtml = '<span class="badge badge-green" style="font-size:11px">✓ Pagado</span> '+
-                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia(''+inst.id+'');renderFlujo()">↩</button>';
+                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia('"+inst.id+"');renderFlujo()">↩</button>';
       }
       const pagadoInfo = inst.estado==='pagado' ? '<div style="font-size:11px;color:var(--green)">✓ '+fmt(inst.montoPagado||inst.monto)+' · '+fmtDate(inst.fechaPago)+'</div>' : '';
       menHtml +=
