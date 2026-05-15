@@ -2709,11 +2709,11 @@ function renderFlujo() {
       const pagoTag = tagPago(inst.pago||obl.pago);
       const montoColor = inst.estado==='pagado' ? 'var(--text3)' : 'var(--red)';
       let btnHtml = '';
-      if (inst.estado==='pendiente') {
-        btnHtml = '<button class="btn btn-primary btn-sm" onclick="pagarInstancia(\'"+ inst.id +"\');renderFlujo()">✓ Pagar</button> '+
+        btnHtml = '<button class="btn btn-primary btn-sm" onclick="pagarInstancia(\'' + inst.id + '\');renderFlujo()">✓ Pagar</button> '+
+                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia(\'' + inst.id + '\');renderFlujo()">⊘</button>';
                   '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia(\'"+ inst.id +"\');renderFlujo()">⊘</button>';
       } else {
-        btnHtml = '<span class="badge badge-green" style="font-size:11px">✓</span> '+
+          '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia(\'' + inst.id + '\');renderFlujo()">↩</button>';
                   '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia(\'"+ inst.id +"\');renderFlujo()">↩</button>';
       }
       const pagadoInfo = inst.estado==='pagado' ? '<div style="font-size:11px;color:var(--green)">✓ '+fmt(inst.montoPagado||inst.monto)+' · '+fmtDate(inst.fechaPago)+'</div>' : '';
@@ -2739,7 +2739,7 @@ function renderFlujo() {
           '<div style="font-size:11px;color:var(--text3)">Vence: '+fmtDate(c.cobro)+'</div>'+
         '</div>'+
         '<div style="display:flex;align-items:center;gap:8px">'+
-          '<span class="mono" style="color:var(--orange)">'+fmt(c.monto)+'</span>'+
+        '<button class="btn btn-primary btn-sm" onclick="marcarCobrado(\'' + c.id + '\');renderFlujo()">✓ Pagar</button>'+
           '<button class="btn btn-primary btn-sm" onclick="marcarCobrado(\'"+ c.id +"\');renderFlujo()">✓ Pagar</button>'+
         '</div>'+
       '</div>';
@@ -2764,7 +2764,7 @@ function renderFlujo() {
 
     flujoHtml +=
       '<div class="card" style="margin-bottom:12px">'+
-        '<div onclick="toggleSemFlujo(\'+semId+\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0">'+
+        '<div data-sid="'+ semId +'" onclick="toggleSemFlujo(this.dataset.sid)" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0">'+'
           '<div>'+
             '<div style="font-weight:700;font-size:14px">'+s.label+'</div>'+
             '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+
@@ -2799,11 +2799,11 @@ function renderFlujo() {
       const obl = state.obligaciones.find(function(o){ return o.id===inst.oblId; })||{};
       const montoColor = inst.estado==='pagado' ? 'var(--text3)' : 'var(--red)';
       let btnHtml = '';
-      if (inst.estado==='pendiente') {
-        btnHtml = '<button class="btn btn-primary btn-sm" onclick="pagarInstancia(\'"+ inst.id +"\');renderFlujo()">✓ Pagar</button> '+
+        btnHtml = '<button class="btn btn-primary btn-sm" onclick="pagarInstancia(\'' + inst.id + '\');renderFlujo()">✓ Pagar</button> '+
+                  '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia(\'' + inst.id + '\');renderFlujo()">⊘</button>';
                   '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="saltarInstancia(\'"+ inst.id +"\');renderFlujo()">⊘ Saltar</button>';
       } else {
-        btnHtml = '<span class="badge badge-green" style="font-size:11px">✓ Pagado</span> '+
+          '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia(\'' + inst.id + '\');renderFlujo()">↩</button>';
                   '<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="despagarInstancia(\'"+ inst.id +"\');renderFlujo()">↩</button>';
       }
       const pagadoInfo = inst.estado==='pagado' ? '<div style="font-size:11px;color:var(--green)">✓ '+fmt(inst.montoPagado||inst.monto)+' · '+fmtDate(inst.fechaPago)+'</div>' : '';
@@ -2822,7 +2822,7 @@ function renderFlujo() {
     });
     flujoHtml +=
       '<div class="card" style="margin-bottom:12px">'+
-        '<div onclick="toggleSemFlujo('flujo-mensuales')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0">'+
+        '<div onclick="toggleSemFlujo(\'flujo-mensuales\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0">'+'
           '<div>'+
             '<div style="font-weight:700;font-size:14px">📅 Obligaciones Mensuales</div>'+
             '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+
