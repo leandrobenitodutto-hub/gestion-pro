@@ -4473,7 +4473,7 @@ function cajSetDesc(id, val) {
   if (g) g.desc = val;
 }
 
-
+function cajUpdateStatus() {
   const status = document.getElementById('caj-gastos-status');
   const total  = parseFloat(document.getElementById('caj-gastos-ef').value||0);
   const totalCargado = _cajGastos.reduce(function(a,g){return a+parseFloat(g.monto||0);},0);
