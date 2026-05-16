@@ -821,11 +821,18 @@
         </div>
 
         <!-- Stat cards resumen del mes -->
-        <div class="grid-4" style="margin-bottom:24px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px">
           <div class="stat-card">
             <div class="stat-accent" style="background:var(--green)"></div>
-            <div class="stat-label">Ingresos del Mes</div>
+            <div class="stat-label">Ingresos Reales</div>
             <div class="stat-value" id="flujo-total-ing">$0</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">Cajas cargadas</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-accent" style="background:#5090e0"></div>
+            <div class="stat-label">Ingresos Proyectados</div>
+            <div class="stat-value" style="color:#5090e0" id="flujo-ing-proyectado">$0</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">Real + estimado</div>
           </div>
           <div class="stat-card">
             <div class="stat-accent" style="background:var(--red)"></div>
@@ -834,7 +841,7 @@
           </div>
           <div class="stat-card">
             <div class="stat-accent" style="background:var(--accent)"></div>
-            <div class="stat-label">Resultado</div>
+            <div class="stat-label">Resultado Proyectado</div>
             <div class="stat-value" id="flujo-resultado">$0</div>
           </div>
           <div class="stat-card">
@@ -2881,6 +2888,7 @@ function renderFlujo() {
   const totalEgresosConCheques = totalEgresos + chqMes;
 
   document.getElementById('flujo-total-ing').textContent = fmt(totalIng);
+  // Calcular ingresos proyectados del mes: suma de ingProyectado por semana (se calcula después de armar semanas)
   document.getElementById('flujo-total-eg').textContent = fmt(totalEgresosConCheques);
   const res = totalIng - totalEgresosConCheques;
   const resEl = document.getElementById('flujo-resultado');
@@ -2988,6 +2996,19 @@ function renderFlujo() {
       ing:ingReales, gasPag:sGas+sOblPag, oblPend:sOblPend, chqPend:sChqPend,
       cajasPorLocal:cajasPorLocal, instSem:instSem, chqSem:chqSem, gasSem:gasSem,
       semPasada:semPasada, semActual:semActual, ingProyectado:ingProyectado, nSems:nSemsRef});
+  }
+
+  // Total proyectado del mes: suma de ingParaCalculo de cada semana
+  const totalIngProyectado = semanas.reduce(function(a,s) {
+    return a + (s.semPasada ? s.ing : (s.ingProyectado > 0 ? s.ingProyectado : s.ing));
+  }, 0);
+  const elProy = document.getElementById('flujo-ing-proyectado');
+  if (elProy) {
+    elProy.textContent = fmt(totalIngProyectado);
+    const resProy = totalIngProyectado - totalEgresosConCheques;
+    const resEl = document.getElementById('flujo-resultado');
+    resEl.textContent = fmt(resProy);
+    resEl.style.color = resProy >= 0 ? 'var(--green)' : 'var(--red)';
   }
 
   // Build DOM nodes
