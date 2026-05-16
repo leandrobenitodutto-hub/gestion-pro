@@ -4443,12 +4443,12 @@ function cajRenderGastos() {
         '<select style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px" '+
           'onchange="cajGastoChange(\''+g.id+'\',\'provId\',this.value)">'+provOpts+'</select>'+
         '<input type="text" placeholder="Descripción (opcional)" value="'+escHtml(g.desc||'')+'" '+
-          'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px" '+
-          'oninput="cajGastoChange(\''+g.id+'\',\'desc\',this.value)">'+
+          'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;width:100%;box-sizing:border-box" '+
+          'oninput="var g=_cajGastos.find(function(x){return x.id===\''+g.id+'\';});if(g)g.desc=this.value">'+
       '</div>'+
-      '<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Monto" value="'+(g.monto||'')+'" '+
-        'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:13px;font-family:monospace;-moz-appearance:textfield" '+
-        'oninput="cajGastoChange(\''+g.id+'\',\'monto\',parseFloat(this.value.replace(/[^0-9.]/g,\'\'))||0)">'+
+      '<input type="text" inputmode="numeric" placeholder="Monto" value="'+(g.monto||'')+'" '+
+        'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:13px;font-family:monospace;width:100%;box-sizing:border-box" '+
+        'oninput="var g=_cajGastos.find(function(x){return x.id===\''+g.id+'\';});if(g)g.monto=parseFloat(this.value.replace(/[^0-9.]/g,\'\'))||0;cajUpdateStatus()">'+
       '<button type="button" onclick="cajEliminarGasto(\''+g.id+'\')" '+
         'style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--red);cursor:pointer;padding:4px 8px;font-size:14px">✕</button>'+
     '</div>';
