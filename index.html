@@ -767,10 +767,22 @@
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Descripción</th><th class="hide-mobile">Monto</th><th></th></tr></thead>
+                <thead><tr><th>Descripción</th><th class="hide-mobile">Día</th><th class="hide-mobile">Monto</th><th></th></tr></thead>
                 <tbody id="tabla-semanales"></tbody>
               </table>
             </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <div class="section-header">
+            <div class="section-title">⚡ Gastos Puntuales (Única vez)</div>
+            <span id="total-unicas" class="badge badge-info">$0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Descripción</th><th>Vencimiento</th><th class="hide-mobile">Monto</th><th></th></tr></thead>
+              <tbody id="tabla-unicas"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1222,8 +1234,9 @@
       <div class="form-group">
         <label>Frecuencia</label>
         <select id="obl-freq" onchange="toggleOblDia()">
-          <option value="mensual">Mensual</option>
-          <option value="semanal">Semanal</option>
+          <option value="mensual">📅 Mensual</option>
+          <option value="semanal">📆 Semanal</option>
+          <option value="unica">⚡ Única (gasto futuro puntual)</option>
         </select>
       </div>
       <div class="form-group" id="obl-dia-wrap-mensual">
@@ -1241,6 +1254,11 @@
           <option value="6">Sábado</option>
           <option value="0">Domingo</option>
         </select>
+      </div>
+      <div class="form-group" id="obl-dia-wrap-unica" style="display:none">
+        <label>Fecha de vencimiento</label>
+        <input type="date" id="obl-fecha-unica">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Se genera una sola vez y no se repite al mes siguiente</div>
       </div>
       <div class="form-group">
         <label>Monto</label>
@@ -2510,10 +2528,14 @@ function renderObligaciones() {
   // Plantillas
   const mensuales = state.obligaciones.filter(o=>o.freq==='mensual');
   const semanales = state.obligaciones.filter(o=>o.freq==='semanal');
+  const unicas    = state.obligaciones.filter(o=>o.freq==='unica');
   const totalMen = mensuales.reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const totalSem = semanales.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalUni = unicas.reduce((a,b)=>a+parseFloat(b.monto||0),0);
   document.getElementById('total-mensuales').textContent = fmt(totalMen)+'/mes';
   document.getElementById('total-semanales').textContent = fmt(totalSem)+'/sem';
+  const elUni = document.getElementById('total-unicas');
+  if (elUni) elUni.textContent = fmt(totalUni);
 
   const renderPlantilla = (list, tbodyId, cols) => {
     const tbody = document.getElementById(tbodyId);
@@ -2536,6 +2558,31 @@ function renderObligaciones() {
   };
   renderPlantilla(mensuales, 'tabla-mensuales', 4);
   renderPlantilla(semanales, 'tabla-semanales', 3);
+
+  // Únicas
+  const tbodyUni = document.getElementById('tabla-unicas');
+  if (tbodyUni) {
+    if (!unicas.length) {
+      tbodyUni.innerHTML = '<tr><td colspan="4"><div class="empty"><p>Sin gastos puntuales cargados</p></div></td></tr>';
+    } else {
+      tbodyUni.innerHTML = unicas.sort((a,b)=>(a.fechaUnica||'')>(b.fechaUnica||'')?1:-1).map(o=>{
+        const inst = state.oblInstancias.find(i=>i.oblId===o.id);
+        const badge = inst
+          ? inst.estado==='pagado' ? '<span class="badge badge-green">✓ Pagado</span>' : '<span class="badge badge-orange">Pendiente</span>'
+          : '<span class="badge badge-gray">—</span>';
+        return `<tr>
+          <td><div style="font-weight:600;font-size:13px">${o.desc}</div>
+              <div style="font-size:11px;color:var(--text3)">${o.cat||''}${o.subcat?' › '+o.subcat:''}</div></td>
+          <td style="font-size:12px">${fmtDate(o.fechaUnica||'')} ${badge}</td>
+          <td class="mono hide-mobile" style="color:var(--red)">${fmt(o.monto)}</td>
+          <td style="display:flex;gap:4px">
+            <button class="btn btn-icon btn-sm" onclick="editarObl('${o.id}')">✏</button>
+            <button class="btn btn-icon btn-sm" onclick="del('obligaciones','${o.id}');renderObligaciones()">🗑</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+  }
 }
 
 function generarInstancias() {
@@ -2838,6 +2885,7 @@ function editarObl(id) {
   document.getElementById('obl-freq').value = o.freq || 'mensual';
   document.getElementById('obl-dia').value = o.dia || '';
   if (o.diaSemana != null) document.getElementById('obl-dia-semana').value = o.diaSemana;
+  if (o.fechaUnica) document.getElementById('obl-fecha-unica').value = o.fechaUnica;
   toggleOblDia();
   document.getElementById('obl-monto').value = o.monto || '';
   document.getElementById('obl-pago').value = o.pago || 'efectivo';
@@ -4005,6 +4053,7 @@ function toggleOblDia() {
   const freq = document.getElementById('obl-freq').value;
   document.getElementById('obl-dia-wrap-mensual').style.display = freq==='mensual' ? '' : 'none';
   document.getElementById('obl-dia-wrap-semanal').style.display = freq==='semanal' ? '' : 'none';
+  document.getElementById('obl-dia-wrap-unica').style.display   = freq==='unica'   ? '' : 'none';
 }
 
 function showOblProvDropdown() {
@@ -4168,11 +4217,13 @@ function saveCheque() {
 function saveObligacion() {
   const editId = document.getElementById('obl-id').value;
   const freq = document.getElementById('obl-freq').value;
+  const fechaUnica = freq==='unica' ? document.getElementById('obl-fecha-unica').value : '';
   const data = {
     desc: document.getElementById('obl-desc').value,
     freq,
     dia: freq==='mensual' ? document.getElementById('obl-dia').value : '',
     diaSemana: freq==='semanal' ? document.getElementById('obl-dia-semana').value : null,
+    fechaUnica: fechaUnica || null,
     monto: document.getElementById('obl-monto').value,
     cat: document.getElementById('obl-cat').value,
     subcat: document.getElementById('obl-subcat')?.value || '',
@@ -4181,13 +4232,30 @@ function saveObligacion() {
     provId: document.getElementById('obl-proveedor').value || null,
   };
   if (!data.desc || !data.monto) return alert('Completá descripción y monto');
+  if (freq==='unica' && !fechaUnica) return alert('Ingresá la fecha de vencimiento');
 
+  let oblId;
   if (editId) {
     const o = state.obligaciones.find(x=>x.id===editId);
-    if (o) Object.assign(o, data);
+    if (o) { Object.assign(o, data); oblId = editId; }
   } else {
-    state.obligaciones.push({ id: uid(), ...data, estado: 'pendiente' });
+    oblId = uid();
+    state.obligaciones.push({ id: oblId, ...data, estado: 'pendiente' });
   }
+
+  // Para únicas: generar instancia automáticamente
+  if (freq==='unica' && fechaUnica && !editId) {
+    const periodo = fechaUnica.slice(0,7);
+    state.oblInstancias.push({
+      id: uid(), oblId, oblDesc: data.desc,
+      periodo, monto: parseFloat(data.monto||0),
+      pago: data.pago||'efectivo', localId: data.localId||null,
+      estado: 'pendiente', semLabel: '',
+      fechaVto: fechaUnica,
+    });
+    showToast('✓ Gasto puntual agregado para '+fmtDate(fechaUnica));
+  }
+
   save();
   closeModal('modal-obligacion');
   renderObligaciones();
