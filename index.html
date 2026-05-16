@@ -739,6 +739,24 @@
             </div>
           </div>
           <div id="obl-instancias-body">
+            <!-- Filtros -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+              <div class="pill-group" style="margin-bottom:0">
+                <span class="pill active" onclick="setInstFilter('todas',this)">Todas</span>
+                <span class="pill" onclick="setInstFilter('pendiente',this)">Pendientes</span>
+                <span class="pill" onclick="setInstFilter('pagado',this)">Pagadas</span>
+                <span class="pill" onclick="setInstFilter('saltado',this)">Saltadas</span>
+              </div>
+              <div class="pill-group" style="margin-bottom:0">
+                <span class="pill active" onclick="setInstFreq('todas',this)">Todas</span>
+                <span class="pill" onclick="setInstFreq('mensual',this)">Mensuales</span>
+                <span class="pill" onclick="setInstFreq('semanal',this)">Semanales</span>
+                <span class="pill" onclick="setInstFreq('unica',this)">Únicas</span>
+              </div>
+              <input type="text" id="inst-search" placeholder="🔍 Buscar obligación..."
+                oninput="renderObligaciones()"
+                style="flex:1;min-width:160px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 12px;font-size:13px">
+            </div>
             <div id="obl-instancias-empty" style="display:none">
               <div class="empty">
                 <div class="empty-icon">📅</div>
@@ -2573,7 +2591,26 @@ function renderObligaciones() {
     empty.style.display = 'none';
     const tbody = document.getElementById('tabla-instancias');
     // Separar mensuales y semanales, ordenar por estado (pendientes primero)
-    const sorted = [...instPeriodo].sort((a,b)=>{
+  // Filtros y buscador
+  const qInst = (document.getElementById('inst-search')?.value||'').toLowerCase().trim();
+  let instFiltradas = [...instPeriodo];
+  if (_instFilter !== 'todas') instFiltradas = instFiltradas.filter(i=>i.estado===_instFilter);
+  if (_instFreq !== 'todas') {
+    instFiltradas = instFiltradas.filter(i=>{
+      const obl = state.obligaciones.find(o=>o.id===i.oblId)||{};
+      return obl.freq === _instFreq;
+    });
+  }
+  if (qInst) {
+    instFiltradas = instFiltradas.filter(i=>{
+      const obl = state.obligaciones.find(o=>o.id===i.oblId)||{};
+      return (i.oblDesc||'').toLowerCase().includes(qInst) ||
+             (obl.cat||'').toLowerCase().includes(qInst) ||
+             (i.semLabel||'').toLowerCase().includes(qInst);
+    });
+  }
+
+  const sorted = [...instFiltradas].sort((a,b)=>{
       const order = {pendiente:0, pagado:1, saltado:2};
       if (a.estado===b.estado) return (a.oblDesc||'').localeCompare(b.oblDesc||'');
       return (order[a.estado]||0) - (order[b.estado]||0);
@@ -2672,7 +2709,23 @@ function renderObligaciones() {
   }
 }
 
-function toggleInstancias() {
+let _instFilter = 'todas';
+let _instFreq   = 'todas';
+
+function setInstFilter(val, el) {
+  _instFilter = val;
+  el.closest('.pill-group').querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  renderObligaciones();
+}
+function setInstFreq(val, el) {
+  _instFreq = val;
+  el.closest('.pill-group').querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  renderObligaciones();
+}
+
+
   const body  = document.getElementById('obl-instancias-body');
   const arrow = document.getElementById('obl-instancias-arrow');
   if (!body) return;
@@ -4687,7 +4740,7 @@ Object.assign(window, {
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
-  autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleInstancias,
+  autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleInstancias, setInstFilter, setInstFreq,
   cajRecalc, cajCheckGastos, cajAgregarGasto, cajEliminarGasto, cajGastoChange, cajSetMonto, cajSetDesc, renderFlujo, abrirAjusteObl, guardarAjusteObl,
   marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
 });
