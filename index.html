@@ -3382,7 +3382,9 @@ function renderFlujo() {
           ? ' <span style="font-size:10px;background:rgba(80,144,224,0.15);color:#5090e0;padding:1px 6px;border-radius:4px">Mensual'+(inst.fechaVto?' vto '+fmtDate(inst.fechaVto):'')+' </span>'
           : ' <span style="font-size:10px;background:rgba(224,144,64,0.15);color:#e09040;padding:1px 6px;border-radius:4px">Semanal</span>';
         left.innerHTML = '<div style="font-size:13px;font-weight:600">'+(inst.oblDesc||obl.desc||'-')+freqTag+'</div>'+
-          '<div style="font-size:11px;color:var(--text3)">'+(obl.cat||'')+'</div>'+
+          '<div style="font-size:11px;color:var(--text3)">'+(obl.cat||'')+
+          (inst.fechaVto ? ' · <span style="color:var(--accent)">Vto: '+fmtDate(inst.fechaVto)+'</span>' : '')+
+          '</div>'+
           (inst.estado==='pagado'?'<div style="font-size:11px;color:var(--green)">✓ '+fmt(inst.montoPagado||inst.monto)+' · '+fmtDate(inst.fechaPago)+'</div>':'');
         const right = document.createElement('div');
         right.style.cssText = 'display:flex;align-items:center;gap:8px';
@@ -3503,7 +3505,9 @@ function renderFlujo() {
       row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)';
       const left = document.createElement('div');
       left.innerHTML = '<div style="font-size:13px;font-weight:600">'+(inst.oblDesc||obl.desc||'-')+'</div>'+
-        '<div style="font-size:11px;color:var(--text3)">'+(obl.cat||'')+' · Día '+(obl.dia||'-')+'</div>'+
+        '<div style="font-size:11px;color:var(--text3)">'+(obl.cat||'')+' · Día '+(obl.dia||'-')+
+        (inst.fechaVto ? ' · <span style="color:var(--accent)">Vto: '+fmtDate(inst.fechaVto)+'</span>' : '')+
+        '</div>'+
         (inst.estado==='pagado'?'<div style="font-size:11px;color:var(--green)">✓ '+fmt(inst.montoPagado||inst.monto)+' · '+fmtDate(inst.fechaPago)+'</div>':'');
       const right = document.createElement('div');
       right.style.cssText = 'display:flex;align-items:center;gap:8px';
