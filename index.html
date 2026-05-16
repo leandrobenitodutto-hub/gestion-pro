@@ -2119,12 +2119,10 @@ function renderDashboard() {
         <td class="mono" style="color:${m._tipo==='ingreso'?'var(--green)':'var(--red)'};font-size:13px;white-space:nowrap">${m._tipo==='ingreso'?'+':'-'}${fmt(m.monto)}</td>
       </tr>`).join('') + '</table></div>';
 
-  // Obligaciones próximas — instancias pendientes de esta semana y siguiente
-  const d2Next = new Date(domSem); d2Next.setDate(d2Next.getDate()+7);
-  const d2NextStr = d2Next.toISOString().slice(0,10);
+  // Obligaciones próximas — próximas 10 instancias pendientes por fechaVto
   const oblProxInst = state.oblInstancias
-    .filter(i=>i.estado==='pendiente'&&i.fechaVto&&i.fechaVto>=hoy&&i.fechaVto<=d2NextStr)
-    .sort((a,b)=>a.fechaVto>b.fechaVto?1:-1).slice(0,6);
+    .filter(i=>i.estado==='pendiente' && i.fechaVto && i.fechaVto>=hoy)
+    .sort((a,b)=>a.fechaVto>b.fechaVto?1:-1).slice(0,10);
   document.getElementById('dash-obligaciones').innerHTML = oblProxInst.length === 0
     ? '<div class="empty"><p>Sin obligaciones próximas</p></div>'
     : '<div class="table-wrap"><table>' + oblProxInst.map(o=>`<tr>
