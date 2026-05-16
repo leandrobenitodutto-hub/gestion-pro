@@ -4476,7 +4476,7 @@ function cajUpdateStatus() {
 
 function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
 
-
+function cajRecalc() {
   const sistema  = parseFloat(document.getElementById('caj-sistema')?.value  || 0);
   const banco    = parseFloat(document.getElementById('caj-banco')?.value    || 0);
   const gastosEf = parseFloat(document.getElementById('caj-gastos-ef')?.value|| 0);
