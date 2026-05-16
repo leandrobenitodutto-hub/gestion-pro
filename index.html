@@ -1398,13 +1398,26 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div class="form-group">
           <label>Gastos en Efectivo</label>
-          <input type="number" id="caj-gastos-ef" placeholder="0.00" min="0" step="0.01" oninput="cajRecalc()">
+          <input type="number" id="caj-gastos-ef" placeholder="0.00" min="0" step="0.01" oninput="cajRecalc();cajCheckGastos()">
         </div>
         <div class="form-group">
           <label>Parcial Efectivo</label>
           <input type="number" id="caj-parcial" placeholder="0.00" min="0" step="0.01" oninput="cajRecalc()">
         </div>
       </div>
+
+      <!-- Desglose de gastos en efectivo -->
+      <div id="caj-gastos-wrap" style="display:none;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600;color:var(--text2)">Desglose de gastos en efectivo</div>
+          <div style="font-size:11px" id="caj-gastos-status"></div>
+        </div>
+        <div id="caj-gastos-lista"></div>
+        <button type="button" class="btn btn-secondary" style="width:100%;margin-top:6px;font-size:12px" onclick="cajAgregarGasto()">
+          + Agregar gasto
+        </button>
+      </div>
+
       <div class="form-group" style="margin-bottom:10px">
         <label>Efectivo (recuento físico)</label>
         <input type="number" id="caj-efectivo" placeholder="0.00" min="0" step="0.01" oninput="cajRecalc()">
@@ -3934,6 +3947,11 @@ function openModal(id) {
   const dateFields = { 'modal-ingreso':'ing-fecha','modal-gasto':'gas-fecha','modal-caja':'caj-fecha','modal-cheque':'chq-emision','modal-transferencia':'trans-fecha' };
   if (dateFields[id]) document.getElementById(dateFields[id]).value = today();
   if (id === 'modal-caja') {
+    _cajGastos = [];
+    const wrap = document.getElementById('caj-gastos-wrap');
+    if (wrap) wrap.style.display = 'none';
+    const lista = document.getElementById('caj-gastos-lista');
+    if (lista) lista.innerHTML = '';
     ['caj-sistema','caj-banco','caj-gastos-ef','caj-parcial','caj-efectivo','caj-notas'].forEach(fid=>{
       const el=document.getElementById(fid); if(el) el.value='';
     });
@@ -4361,7 +4379,104 @@ function saveObligacion() {
   document.getElementById('obl-save-btn').textContent = 'Guardar';
 }
 
-function cajRecalc() {
+// ── GASTOS DESGLOSE EN CAJA ──────────────────────────────
+let _cajGastos = []; // array temporal de gastos mientras se carga la caja
+
+function cajCheckGastos() {
+  const total = parseFloat(document.getElementById('caj-gastos-ef').value||0);
+  const wrap  = document.getElementById('caj-gastos-wrap');
+  if (!wrap) return;
+  if (total > 0) {
+    wrap.style.display = 'block';
+    cajRenderGastos();
+  } else {
+    wrap.style.display = 'none';
+    _cajGastos = [];
+  }
+}
+
+function cajAgregarGasto() {
+  _cajGastos.push({ id: uid(), provId: '', desc: '', monto: 0 });
+  cajRenderGastos();
+}
+
+function cajEliminarGasto(id) {
+  _cajGastos = _cajGastos.filter(function(g){ return g.id !== id; });
+  cajRenderGastos();
+}
+
+function cajRenderGastos() {
+  const lista  = document.getElementById('caj-gastos-lista');
+  const status = document.getElementById('caj-gastos-status');
+  const total  = parseFloat(document.getElementById('caj-gastos-ef').value||0);
+  if (!lista) return;
+
+  const totalCargado = _cajGastos.reduce(function(a,g){return a+parseFloat(g.monto||0);},0);
+  const diff = total - totalCargado;
+  const completo = Math.abs(diff) < 1;
+
+  if (status) {
+    if (_cajGastos.length === 0) {
+      status.innerHTML = '';
+    } else if (completo) {
+      status.innerHTML = '<span style="color:var(--green);font-weight:700">✓ Completo</span>';
+    } else if (diff > 0) {
+      status.innerHTML = '<span style="color:var(--orange)">Faltan: <strong>'+fmt(diff)+'</strong></span>';
+    } else {
+      status.innerHTML = '<span style="color:var(--red)">Excede: <strong>'+fmt(-diff)+'</strong></span>';
+    }
+  }
+
+  lista.innerHTML = _cajGastos.map(function(g) {
+    const prov = state.proveedores.find(function(p){return p.id===g.provId;});
+    const provNombre = prov ? prov.nombre : '';
+    // Sorted proveedores for select
+    const provOpts = '<option value="">— Proveedor —</option>' +
+      [...state.proveedores].sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');})
+      .map(function(p){ return '<option value="'+p.id+'"'+(g.provId===p.id?' selected':'')+'>'+p.nombre+'</option>'; }).join('');
+
+    return '<div style="display:grid;grid-template-columns:1fr 120px 36px;gap:6px;margin-bottom:6px;align-items:center" id="caj-gasto-row-'+g.id+'">'+
+      '<div style="display:grid;grid-template-columns:1fr;gap:4px">'+
+        '<select style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px" '+
+          'onchange="cajGastoChange(\''+g.id+'\',\'provId\',this.value)">'+provOpts+'</select>'+
+        '<input type="text" placeholder="Descripción (opcional)" value="'+escHtml(g.desc||'')+'" '+
+          'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px" '+
+          'oninput="cajGastoChange(\''+g.id+'\',\'desc\',this.value)">'+
+      '</div>'+
+      '<input type="number" placeholder="Monto" value="'+(g.monto||'')+'" min="0" step="0.01" '+
+        'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:13px;font-family:monospace" '+
+        'oninput="cajGastoChange(\''+g.id+'\',\'monto\',parseFloat(this.value)||0)">'+
+      '<button type="button" onclick="cajEliminarGasto(\''+g.id+'\')" '+
+        'style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--red);cursor:pointer;padding:4px 8px;font-size:14px">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+function cajGastoChange(id, field, value) {
+  const g = _cajGastos.find(function(x){return x.id===id;});
+  if (g) {
+    g[field] = value;
+    if (field === 'monto') cajRenderGastos(); // solo re-render status
+    else { /* no re-render completo para no perder foco */ cajUpdateStatus(); }
+  }
+}
+
+function cajUpdateStatus() {
+  const status = document.getElementById('caj-gastos-status');
+  const total  = parseFloat(document.getElementById('caj-gastos-ef').value||0);
+  const totalCargado = _cajGastos.reduce(function(a,g){return a+parseFloat(g.monto||0);},0);
+  const diff = total - totalCargado;
+  const completo = Math.abs(diff) < 1;
+  if (status) {
+    if (completo) status.innerHTML = '<span style="color:var(--green);font-weight:700">✓ Completo</span>';
+    else if (diff > 0) status.innerHTML = '<span style="color:var(--orange)">Faltan: <strong>'+fmt(diff)+'</strong></span>';
+    else status.innerHTML = '<span style="color:var(--red)">Excede: <strong>'+fmt(-diff)+'</strong></span>';
+  }
+}
+
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+
+
   const sistema  = parseFloat(document.getElementById('caj-sistema')?.value  || 0);
   const banco    = parseFloat(document.getElementById('caj-banco')?.value    || 0);
   const gastosEf = parseFloat(document.getElementById('caj-gastos-ef')?.value|| 0);
@@ -4395,17 +4510,40 @@ function saveCaja() {
   const totalEf   = gastosEf+parcial+efectivo;
   const totalReal = totalEf+banco;
   const dif       = totalReal-sistema;
+  const cajaId = editId || uid();
   const data = { fecha,localId,sistema,banco,gastosEf,parcial,efectivo,totalEf,totalReal,dif,
     notas:document.getElementById('caj-notas').value };
   if (editId) {
     const o=state.cajas.find(x=>x.id===editId); if(o) Object.assign(o,data);
   } else {
-    state.cajas.push({id:uid(),...data});
+    state.cajas.push({id:cajaId,...data});
   }
+
+  // Guardar gastos del desglose como gastos reales
+  if (_cajGastos.length > 0) {
+    _cajGastos.forEach(function(g) {
+      if (!g.monto || g.monto <= 0) return;
+      const prov = state.proveedores.find(function(p){return p.id===g.provId;});
+      state.gastos.push({
+        id: uid(),
+        fecha: fecha,
+        monto: g.monto,
+        pago: 'efectivo',
+        cat: (prov&&prov.cat)||'',
+        subcat: (prov&&prov.subcat)||'',
+        provId: g.provId||null,
+        localId: localId,
+        desc: g.desc || (prov?prov.nombre:'Gasto caja'),
+        _cajaId: cajaId,
+      });
+    });
+  }
+
   save(); closeModal('modal-caja'); renderCajas(); updateTopbar();
   ['caj-sistema','caj-banco','caj-gastos-ef','caj-parcial','caj-efectivo','caj-notas'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
+  _cajGastos = [];
   cajRecalc();
 }
 
@@ -4517,7 +4655,7 @@ Object.assign(window, {
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
   autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleInstancias,
-  cajRecalc, renderFlujo, abrirAjusteObl, guardarAjusteObl,
+  cajRecalc, cajCheckGastos, cajAgregarGasto, cajEliminarGasto, cajGastoChange, renderFlujo, abrirAjusteObl, guardarAjusteObl,
   marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
 });
 </script>
