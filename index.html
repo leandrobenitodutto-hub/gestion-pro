@@ -508,13 +508,11 @@
           <div class="card">
             <div class="section-header">
               <div>
-                <div class="section-title">Cajas por Local — Hoy</div>
-                <div class="section-sub">Ventas del día por unidad</div>
+                <div class="section-title">Resultado Semana Actual</div>
+                <div class="section-sub">Ingresos y gastos de esta semana</div>
               </div>
             </div>
-            <div id="dash-cajas-locales">
-              <div class="empty"><div class="empty-icon">🏪</div><p>Sin datos de hoy</p></div>
-            </div>
+            <div id="dash-cajas-locales"></div>
           </div>
           <div class="card">
             <div class="section-header">
@@ -1675,27 +1673,6 @@
     </div>
   </div>
 </div>
-  <div class="modal" style="max-width:400px">
-    <div class="modal-header">
-      <h3>Ajustar Monto Proyectado</h3>
-      <button class="btn-icon" onclick="closeModal('modal-ajuste-obl')">✕</button>
-    </div>
-    <input type="hidden" id="ajuste-obl-id">
-    <input type="hidden" id="ajuste-obl-semana">
-    <div style="margin-bottom:16px;padding:12px;background:var(--surface2);border-radius:8px;font-size:13px;color:var(--text2)">
-      <span id="ajuste-obl-info">—</span>
-    </div>
-    <div class="form-group">
-      <label>Monto para esta semana/mes</label>
-      <input type="number" id="ajuste-obl-monto" placeholder="0.00" min="0" step="0.01">
-      <div style="font-size:11px;color:var(--text3);margin-top:4px">Solo afecta este período. El resto sigue con el importe base.</div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-ajuste-obl')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarAjusteObl()">Guardar Ajuste</button>
-    </div>
-  </div>
-</div>
 <script type="module">
 // ========================= FIREBASE CONFIG =========================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -2073,25 +2050,44 @@ function renderDashboard() {
   document.getElementById('stat-ingresos').textContent = fmt(ventasMes + otrosIngMes);
   document.getElementById('stat-gastos').textContent = fmt(gasMesStat + oblPagMesStat);
 
-  // Cajas de hoy
+  // Resultado semana actual
   const hoy = today();
-  const cajasHoy = state.cajas.filter(c=>c.fecha===hoy);
-  let cajasHtml = '';
-  if (state.locales.length === 0) {
-    cajasHtml = '<div class="empty"><div class="empty-icon">🏪</div><p>Sin locales registrados</p></div>';
-  } else {
-    cajasHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">';
-    state.locales.forEach(loc => {
-      const caja = cajasHoy.find(c=>c.localId===loc.id);
-      const total = caja ? parseFloat(caja.efectivo||0)+parseFloat(caja.tarjeta||0) : null;
-      cajasHtml += `<div class="card-sm" style="border-left:3px solid ${loc.color||'#f0c040'}">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">${loc.tipo==='pancheria'?'🌭':'🍦'} ${loc.nombre}</div>
-        <div style="font-size:18px;font-family:'DM Mono',monospace;color:var(--text)">${total!==null ? fmt(total) : '<span style="color:var(--text3);font-size:13px">Sin carga</span>'}</div>
-      </div>`;
-    });
-    cajasHtml += '</div>';
-  }
-  document.getElementById('dash-cajas-locales').innerHTML = cajasHtml;
+  const hoyDate = new Date(hoy);
+  // Encontrar lunes de la semana actual
+  const diaSem = hoyDate.getDay() === 0 ? 6 : hoyDate.getDay() - 1;
+  const lunesSem = new Date(hoyDate); lunesSem.setDate(hoyDate.getDate() - diaSem);
+  const domSem = new Date(lunesSem); domSem.setDate(lunesSem.getDate() + 6);
+  const d1Sem = lunesSem.toISOString().slice(0,10);
+  const d2Sem = domSem.toISOString().slice(0,10);
+  const ingSem  = state.cajas.filter(c=>c.fecha>=d1Sem&&c.fecha<=d2Sem).reduce((a,b)=>a+parseFloat(b.totalReal||0),0)
+                + state.ingresos.filter(i=>i.fecha>=d1Sem&&i.fecha<=d2Sem).reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const gasSem  = state.gastos.filter(g=>g.fecha>=d1Sem&&g.fecha<=d2Sem).reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const oblSem  = state.oblInstancias.filter(i=>i.estado==='pagado'&&i.fechaPago>=d1Sem&&i.fechaPago<=d2Sem).reduce((a,b)=>a+parseFloat(b.montoPagado||b.monto||0),0);
+  const resSem  = ingSem - gasSem - oblSem;
+  const oblPendSem = state.oblInstancias.filter(i=>i.periodo===mes&&i.estado==='pendiente');
+  const totalOblPend = oblPendSem.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const fmtLunes = lunesSem.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
+  const fmtDom   = domSem.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
+
+  document.getElementById('dash-cajas-locales').innerHTML = `
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">${fmtLunes} al ${fmtDom}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:var(--surface2);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--text3)">↑ Ingresos reales</div>
+          <div class="mono" style="font-size:16px;color:var(--green);font-weight:700">${fmt(ingSem)}</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--text3)">↓ Gastos pagados</div>
+          <div class="mono" style="font-size:16px;color:var(--red);font-weight:700">${fmt(gasSem+oblSem)}</div>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:10px;margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;font-weight:600">Resultado</span>
+        <span class="mono" style="font-size:18px;font-weight:700;color:${resSem>=0?'var(--green)':'var(--red)'}">${resSem>=0?'+':''}${fmt(resSem)}</span>
+      </div>
+      ${totalOblPend>0?`<div style="font-size:11px;color:var(--orange);margin-top:6px">⚠ Obligaciones pendientes esta semana: ${fmt(totalOblPend)}</div>`:''}
+    </div>`;
 
   // Cheques próximos
   const en30 = new Date(); en30.setDate(en30.getDate()+30);
@@ -2100,26 +2096,40 @@ function renderDashboard() {
     ? '<div class="empty"><p>Sin cheques próximos a vencer</p></div>'
     : '<div class="table-wrap"><table>' + chqProx.map(c=>`<tr><td>${fmtDate(c.cobro)}</td><td>${c.titular}</td><td class="mono" style="color:${c.tipo==='recibido'?'var(--green)':'var(--red)'}">${fmt(c.monto)}</td></tr>`).join('') + '</table></div>';
 
-  // Últimos movimientos (incluye cajas como ventas)
+  // Últimos movimientos — con proveedor
   const cajasMovs = state.cajas.map(c=>({
     id: c.id, fecha: c.fecha, _tipo: 'ingreso',
     desc: '🏪 Ventas ' + getLocalNombre(c.localId),
-    monto: parseFloat(c.efectivo||0) + parseFloat(c.tarjeta||0)
+    prov: getLocalNombre(c.localId),
+    monto: parseFloat(c.totalReal||0)
   }));
   const movs = [
-    ...state.ingresos.map(i=>({...i, _tipo:'ingreso'})),
-    ...state.gastos.map(g=>({...g, _tipo:'gasto'})),
+    ...state.ingresos.map(i=>({...i, _tipo:'ingreso', prov: getProvNombre(i.provId)||getLocalNombre(i.localId)||'—'})),
+    ...state.gastos.filter(g=>!g._oblId&&!g._chqId).map(g=>({...g, _tipo:'gasto', prov: getProvNombre(g.provId)||'—'})),
     ...cajasMovs
   ].sort((a,b)=>b.fecha>a.fecha?1:-1).slice(0,8);
   document.getElementById('dash-movimientos').innerHTML = movs.length === 0
     ? '<div class="empty"><p>Sin movimientos</p></div>'
-    : '<div class="table-wrap"><table>' + movs.map(m=>`<tr><td style="font-size:12px">${fmtDate(m.fecha)}</td><td>${m.desc||'-'}</td><td class="mono" style="color:${m._tipo==='ingreso'?'var(--green)':'var(--red)'}; font-size:13px">${m._tipo==='ingreso'?'+':'-'}${fmt(m.monto)}</td></tr>`).join('') + '</table></div>';
+    : '<div class="table-wrap"><table>' +
+      movs.map(m=>`<tr>
+        <td style="font-size:12px;white-space:nowrap">${fmtDate(m.fecha)}</td>
+        <td style="font-size:12px;color:var(--text2)">${m.prov||m.desc||'—'}</td>
+        <td class="mono" style="color:${m._tipo==='ingreso'?'var(--green)':'var(--red)'};font-size:13px;white-space:nowrap">${m._tipo==='ingreso'?'+':'-'}${fmt(m.monto)}</td>
+      </tr>`).join('') + '</table></div>';
 
-  // Obligaciones próximas
-  const oblProx = state.obligaciones.filter(o=>o.estado!=='pagado').slice(0,6);
-  document.getElementById('dash-obligaciones').innerHTML = oblProx.length === 0
-    ? '<div class="empty"><p>Sin obligaciones pendientes</p></div>'
-    : '<div class="table-wrap"><table>' + oblProx.map(o=>`<tr><td>${o.desc}</td><td style="font-size:11px;color:var(--text3)">${o.freq} · Día ${o.dia}</td><td class="mono" style="color:var(--red)">${fmt(o.monto)}</td></tr>`).join('') + '</table></div>';
+  // Obligaciones próximas — instancias pendientes de esta semana y siguiente
+  const d2Next = new Date(domSem); d2Next.setDate(d2Next.getDate()+7);
+  const d2NextStr = d2Next.toISOString().slice(0,10);
+  const oblProxInst = state.oblInstancias
+    .filter(i=>i.estado==='pendiente'&&i.fechaVto&&i.fechaVto>=hoy&&i.fechaVto<=d2NextStr)
+    .sort((a,b)=>a.fechaVto>b.fechaVto?1:-1).slice(0,6);
+  document.getElementById('dash-obligaciones').innerHTML = oblProxInst.length === 0
+    ? '<div class="empty"><p>Sin obligaciones próximas</p></div>'
+    : '<div class="table-wrap"><table>' + oblProxInst.map(o=>`<tr>
+        <td style="font-size:12px">${o.oblDesc||'—'}</td>
+        <td style="font-size:11px;color:var(--text3)">${fmtDate(o.fechaVto)}</td>
+        <td class="mono" style="color:var(--red)">${fmt(o.monto)}</td>
+      </tr>`).join('') + '</table></div>';
 
   // Badges
   const chqPend = state.cheques.filter(c=>c.estado==='pendiente').length;
