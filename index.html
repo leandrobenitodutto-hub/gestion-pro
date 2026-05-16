@@ -1983,7 +1983,13 @@ function renderPage(page) {
 // ========================= FORMATTERS =========================
 function fmt(n) { return '$' + parseFloat(n||0).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:0}); }
 function fmtDate(d) { if (!d) return ''; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
-function today() { return new Date().toISOString().slice(0,10); }
+function today() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+dd;
+}
 function thisMonth() { return new Date().toISOString().slice(0,7); }
 function getLocalNombre(id) { const l = state.locales.find(x=>x.id===id); return l ? l.nombre : '-'; }
 function getProvNombre(id) { const p = state.proveedores.find(x=>x.id===id); return p ? p.nombre : '-'; }
@@ -2119,15 +2125,56 @@ function renderDashboard() {
         <td class="mono" style="color:${m._tipo==='ingreso'?'var(--green)':'var(--red)'};font-size:13px;white-space:nowrap">${m._tipo==='ingreso'?'+':'-'}${fmt(m.monto)}</td>
       </tr>`).join('') + '</table></div>';
 
-  // Obligaciones próximas — próximas 10 instancias pendientes por fechaVto
-  const oblProxInst = state.oblInstancias
-    .filter(i=>i.estado==='pendiente' && i.fechaVto && i.fechaVto>=hoy)
-    .sort((a,b)=>a.fechaVto>b.fechaVto?1:-1).slice(0,10);
+  // Obligaciones próximas — próximas 10 instancias pendientes
+  // Incluye mensuales (por fechaVto) y semanales (por semLabel)
+  const todasPendientes = state.oblInstancias.filter(i=>i.estado==='pendiente');
+
+  // Calcular fecha efectiva de cada instancia para ordenar
+  const conFecha = todasPendientes.map(i=>{
+    let fechaEfectiva = i.fechaVto || '';
+    if (!fechaEfectiva && i.semLabel) {
+      // semLabel formato: "Sem X (DD/MM-DD/MM)" — extraer DD y MM del inicio
+      const m2 = i.semLabel.match(/\((\d+)\/(\d+)/);
+      if (m2) {
+        const dd = m2[1].padStart(2,'0');
+        const mm = m2[2].padStart(2,'0');
+        fechaEfectiva = i.periodo+'-'+mm+'-'+dd;
+      }
+    }
+    return {...i, fechaEfectiva};
+  }).filter(i=>i.fechaEfectiva>=hoy)
+    .sort((a,b)=>a.fechaEfectiva>b.fechaEfectiva?1:-1)
+    .slice(0,10);
+
+  let oblProxInst = conFecha;
+
+  // Fallback a plantillas si no hay instancias generadas
+  if (oblProxInst.length === 0) {
+    const [hy, hm] = hoy.split('-').map(Number);
+    const pad2 = n=>String(n).padStart(2,'0');
+    const proxPlantillas = [];
+    state.obligaciones.forEach(o=>{
+      if (o.freq==='mensual' && o.dia) {
+        let y=hy, m=hm;
+        let dia = parseInt(o.dia);
+        let fechaVto = y+'-'+pad2(m)+'-'+pad2(Math.min(dia,new Date(y,m,0).getDate()));
+        if (fechaVto < hoy) { m++; if(m>12){m=1;y++;} fechaVto=y+'-'+pad2(m)+'-'+pad2(Math.min(dia,new Date(y,m,0).getDate())); }
+        proxPlantillas.push({oblDesc:o.desc, fechaEfectiva:fechaVto, monto:o.monto, _plantilla:true});
+      } else if (o.freq==='semanal') {
+        const nextLun = new Date(hoyDate);
+        const dl = nextLun.getDay()===1?0:(8-nextLun.getDay())%7||7;
+        nextLun.setDate(nextLun.getDate()+dl);
+        proxPlantillas.push({oblDesc:o.desc, fechaEfectiva:nextLun.toISOString().slice(0,10), monto:o.monto, _plantilla:true});
+      }
+    });
+    oblProxInst = proxPlantillas.sort((a,b)=>a.fechaEfectiva>b.fechaEfectiva?1:-1).slice(0,10);
+  }
+
   document.getElementById('dash-obligaciones').innerHTML = oblProxInst.length === 0
     ? '<div class="empty"><p>Sin obligaciones próximas</p></div>'
     : '<div class="table-wrap"><table>' + oblProxInst.map(o=>`<tr>
         <td style="font-size:12px">${o.oblDesc||'—'}</td>
-        <td style="font-size:11px;color:var(--text3)">${fmtDate(o.fechaVto)}</td>
+        <td style="font-size:11px;color:var(--text3)">${fmtDate(o.fechaEfectiva||o.fechaVto)}${o._plantilla?'<span style="color:var(--text3);font-size:10px"> est.</span>':''}</td>
         <td class="mono" style="color:var(--red)">${fmt(o.monto)}</td>
       </tr>`).join('') + '</table></div>';
 
