@@ -809,6 +809,12 @@
           </button>
         </div>
         <div class="card" style="margin-bottom:20px">
+          <div class="section-header" style="margin-bottom:12px">
+            <div>
+              <div class="section-title">Ventas del Mes por Local</div>
+              <div class="section-sub">Acumulado del mes actual</div>
+            </div>
+          </div>
           <div id="cajas-resumen-hoy" class="grid-3" style="gap:12px;margin-bottom:0"></div>
         </div>
         <div class="card">
@@ -3028,9 +3034,9 @@ function renderCajas() {
   let data = [...state.cajas].sort((a,b)=>b.fecha>a.fecha?1:-1);
   if (fecha) data = data.filter(c=>c.fecha===fecha);
 
-  // Resumen hoy
-  const hoy = today();
-  const cajasHoy = state.cajas.filter(c=>c.fecha===hoy);
+  // Resumen mes actual por local
+  const mes = today().slice(0,7);
+  const cajasMes = state.cajas.filter(c=>c.fecha&&c.fecha.startsWith(mes));
   let resHtml = '';
   if (state.locales.length === 0) {
     resHtml = `<div style="grid-column:1/-1;text-align:center;padding:24px">
@@ -3039,15 +3045,19 @@ function renderCajas() {
       <button class="btn btn-primary" onclick="openModal('modal-local');navigate('locales')">+ Agregar mi primer local</button>
     </div>`;
   } else {
+    const totalMes = cajasMes.reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
     state.locales.forEach(loc => {
-      const caja = cajasHoy.find(c=>c.localId===loc.id);
-      const totalReal = caja ? parseFloat(caja.totalReal||0) : null;
-      const dif = caja ? parseFloat(caja.dif||0) : null;
-      const difColor = dif === null ? '' : dif > 0 ? 'var(--green)' : dif < 0 ? 'var(--red)' : 'var(--text3)';
+      const cajasLoc = cajasMes.filter(c=>c.localId===loc.id);
+      const totalLoc = cajasLoc.reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
+      const diasCargados = cajasLoc.length;
+      const pct = totalMes > 0 ? Math.round(totalLoc/totalMes*100) : 0;
       resHtml += `<div class="card-sm" style="border-left:3px solid ${loc.color||'var(--accent)'}">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:6px">${loc.tipo==='pancheria'?'🌭':'🍦'} ${loc.nombre} <span style="font-size:10px">• Hoy</span></div>
-        <div style="font-family:'DM Mono',monospace;font-size:20px;margin-bottom:4px">${totalReal!==null ? fmt(totalReal) : '<span style="color:var(--text3);font-size:13px">Sin carga</span>'}</div>
-        ${dif !== null ? `<div style="font-size:11px;color:${difColor}">${dif > 0 ? '↑ Sobra' : dif < 0 ? '↓ Falta' : '✓ Cuadra'} ${dif !== 0 ? fmt(Math.abs(dif)) : ''}</div>` : ''}
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">${loc.tipo==='pancheria'?'🌭':'🍦'} ${loc.nombre}</div>
+        <div class="mono" style="font-size:20px;font-weight:700;margin-bottom:4px;color:var(--green)">${fmt(totalLoc)}</div>
+        <div style="background:var(--border);border-radius:3px;height:4px;margin-bottom:4px">
+          <div style="background:${loc.color||'var(--accent)'};height:4px;border-radius:3px;width:${pct}%"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">${diasCargados} días cargados · ${pct}% del total</div>
       </div>`;
     });
   }
