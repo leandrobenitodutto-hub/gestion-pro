@@ -728,21 +728,27 @@
 
         <!-- Instancias del período -->
         <div class="card" style="margin-bottom:16px">
-          <div class="section-header">
+          <div class="section-header" onclick="toggleInstancias()" style="cursor:pointer;user-select:none">
             <div class="section-title" id="obl-periodo-titulo">Instancias del Período</div>
-          </div>
-          <div id="obl-instancias-empty" style="display:none">
-            <div class="empty">
-              <div class="empty-icon">📅</div>
-              <p>No hay instancias generadas para este período.<br>
-              Tocá <strong>⚡ Generar período</strong> para crear las obligaciones de este mes/semana.</p>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="obl-instancias-badge" style="font-size:12px;color:var(--text3)"></span>
+              <span id="obl-instancias-arrow" style="font-size:16px;color:var(--text3)">▲</span>
             </div>
           </div>
-          <div class="table-wrap" id="obl-instancias-wrap">
-            <table>
-              <thead><tr><th>Obligación</th><th class="hide-mobile">Categoría</th><th class="hide-mobile">Local</th><th class="hide-mobile">F.Pago</th><th class="mono">Monto Est.</th><th>Estado</th><th></th></tr></thead>
-              <tbody id="tabla-instancias"></tbody>
-            </table>
+          <div id="obl-instancias-body">
+            <div id="obl-instancias-empty" style="display:none">
+              <div class="empty">
+                <div class="empty-icon">📅</div>
+                <p>No hay instancias generadas para este período.<br>
+                Tocá <strong>⚡ Generar período</strong> para crear las obligaciones de este mes/semana.</p>
+              </div>
+            </div>
+            <div class="table-wrap" id="obl-instancias-wrap">
+              <table>
+                <thead><tr><th>Obligación</th><th class="hide-mobile">Categoría</th><th class="hide-mobile">Local</th><th class="hide-mobile">F.Pago</th><th class="mono">Monto Est.</th><th>Estado</th><th></th></tr></thead>
+                <tbody id="tabla-instancias"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -2467,7 +2473,9 @@ function renderObligaciones() {
   document.getElementById('obl-stat-total').textContent = fmt(totalEst);
   document.getElementById('obl-stat-pagado').textContent = fmt(totalPag);
   document.getElementById('obl-stat-pendiente').textContent = fmt(totalPend);
-  document.getElementById('obl-stat-count').textContent = `${pagadasCount}/${instPeriodo.length}`;
+  // Badge con progreso
+  const badge = document.getElementById('obl-instancias-badge');
+  if (badge) badge.textContent = pagadasCount+'/'+instPeriodo.length+' pagadas';
 
   // Título período
   const [y,m] = periodo.split('-');
@@ -2585,7 +2593,16 @@ function renderObligaciones() {
   }
 }
 
-function generarInstancias() {
+function toggleInstancias() {
+  const body  = document.getElementById('obl-instancias-body');
+  const arrow = document.getElementById('obl-instancias-arrow');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display  = open ? 'none' : '';
+  if (arrow) arrow.textContent = open ? '▼' : '▲';
+}
+
+
   const periodo = document.getElementById('obl-periodo-sel')?.value || thisMonth();
   const [y,m] = periodo.split('-').map(Number);
   const label = new Date(y,m-1,1).toLocaleString('es-AR',{month:'long',year:'numeric'});
@@ -4418,7 +4435,7 @@ Object.assign(window, {
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
-  autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia,
+  autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleInstancias,
   cajRecalc, renderFlujo, abrirAjusteObl, guardarAjusteObl,
   marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
 });
