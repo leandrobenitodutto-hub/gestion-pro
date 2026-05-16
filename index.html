@@ -3217,7 +3217,14 @@ function renderFlujo() {
     var instMenSem = state.oblInstancias.filter(function(i){
       return i.periodo===mes && !i.semLabel && i.fechaVto && i.fechaVto>=d1 && i.fechaVto<=d2 && i.estado!=='saltado';
     });
-    var instSem = instSemLabel.concat(instMenSem);
+    var instSem = instSemLabel.concat(instMenSem).sort(function(a,b){
+      var fa = a.fechaVto || '';
+      var fb = b.fechaVto || '';
+      if (fa && fb) return fa > fb ? 1 : -1;
+      if (fa) return -1;
+      if (fb) return 1;
+      return 0;
+    });
     var sOblPend  = instSem.length > 0
       ? instSem.filter(function(i){return i.estado==='pendiente';}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0)
       : state.obligaciones.filter(function(o){return o.freq==='semanal';}).reduce(function(a,o){return a+getMontoObl(o,semKey);},0);
@@ -3474,7 +3481,8 @@ function renderFlujo() {
 
   // Obligaciones mensuales
   // Solo mostrar mensuales que NO tienen semLabel (no fueron asignadas a ninguna semana)
-  const instMenMes = state.oblInstancias.filter(i=>i.periodo===mes&&!i.semLabel&&i.estado!=='saltado');
+  const instMenMes = state.oblInstancias.filter(i=>i.periodo===mes&&!i.semLabel&&i.estado!=='saltado')
+    .sort(function(a,b){ return (a.fechaVto||'') > (b.fechaVto||'') ? 1 : -1; });
   const menCard = document.createElement('div');
   menCard.className = 'card';
   menCard.style.marginBottom = '12px';
