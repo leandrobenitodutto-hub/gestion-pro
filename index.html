@@ -950,6 +950,48 @@
           </button>
         </div>
         <div id="grid-locales" class="grid-3"></div>
+
+        <!-- Saldo de Apertura -->
+        <div class="card" style="margin-top:20px">
+          <div class="section-header">
+            <div>
+              <div class="section-title">⚙ Saldo de Apertura</div>
+              <div class="section-sub">Saldo real en caja y banco al momento de empezar a usar el sistema. Se carga una sola vez.</div>
+            </div>
+          </div>
+          <div class="form-grid" style="max-width:600px">
+            <div class="form-group">
+              <label>Fecha de apertura</label>
+              <input type="date" id="param-fecha-apertura">
+              <div style="font-size:11px;color:var(--text3);margin-top:4px">Solo se cuentan movimientos desde esta fecha</div>
+            </div>
+            <div class="form-group">
+              <label>💵 Saldo inicial Caja (Efectivo)</label>
+              <input type="number" id="param-saldo-caja" placeholder="0" min="0" step="1">
+            </div>
+            <div class="form-group">
+              <label>🏦 Saldo inicial Banco</label>
+              <input type="number" id="param-saldo-banco" placeholder="0" min="0" step="1">
+            </div>
+            <div class="form-group full" style="display:flex;align-items:flex-end;gap:12px">
+              <button class="btn btn-primary" onclick="guardarParametros()">💾 Guardar saldo de apertura</button>
+              <div id="param-resultado" style="font-size:13px;color:var(--green);display:none">✓ Guardado</div>
+            </div>
+          </div>
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+            <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Saldos actuales calculados:</div>
+            <div style="display:flex;gap:16px">
+              <div style="background:var(--surface2);border-radius:8px;padding:10px 16px">
+                <div style="font-size:11px;color:var(--text3)">💵 Caja</div>
+                <div class="mono" style="font-size:18px;font-weight:700;color:var(--green)" id="param-preview-caja">$0</div>
+              </div>
+              <div style="background:var(--surface2);border-radius:8px;padding:10px 16px">
+                <div style="font-size:11px;color:var(--text3)">🏦 Banco</div>
+                <div class="mono" style="font-size:18px;font-weight:700;color:#5090e0" id="param-preview-banco">$0</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- =================== CATEGORÍAS =================== -->
@@ -1841,7 +1883,8 @@ let state = {
   cajas: [],
   oblAjustes: [],
   transferencias: [],
-  oblInstancias: [], // { id, oblId, periodo, monto, pago, fecha, estado, _gastoId }
+  oblInstancias: [],
+  parametros: { saldoInicialCaja: 0, saldoInicialBanco: 0, fechaApertura: '' },
 };
 
 // ========================= FLUJO TOGGLE =========================
@@ -2042,26 +2085,29 @@ function tagPago(p) {
 // Los INGRESOS son otras fuentes (alquileres cobrados, préstamos, etc.)
 // No se mezclan para evitar doble conteo.
 function calcSaldos() {
-  let caja = 0, banco = 0;
-  // Otros ingresos (no ventas de locales)
+  const p = state.parametros || {};
+  const fechaAp = p.fechaApertura || '';
+  // Saldo de apertura como base
+  let caja  = parseFloat(p.saldoInicialCaja  || 0);
+  let banco = parseFloat(p.saldoInicialBanco || 0);
+  // Solo movimientos desde la fecha de apertura
   state.ingresos.forEach(i => {
+    if (fechaAp && i.fecha < fechaAp) return;
     if (i.pago === 'efectivo') caja += parseFloat(i.monto||0);
     else banco += parseFloat(i.monto||0);
   });
-  // Gastos
   state.gastos.forEach(g => {
+    if (fechaAp && g.fecha < fechaAp) return;
     if (g.pago === 'efectivo') caja -= parseFloat(g.monto||0);
     else if (g.pago === 'banco') banco -= parseFloat(g.monto||0);
   });
-  // Ventas de locales (cajas) — fuente principal de ingresos
-  // totalEf = gastos_ef + parcial + efectivo_fisico (todo lo que movió el efectivo)
-  // banco   = cobrado por medios bancarios
   state.cajas.forEach(c => {
+    if (fechaAp && c.fecha < fechaAp) return;
     caja  += parseFloat(c.totalEf||0);
     banco += parseFloat(c.banco||0);
   });
-  // Transferencias (neutras en resultado, mueven entre caja y banco)
   state.transferencias.forEach(t => {
+    if (fechaAp && t.fecha < fechaAp) return;
     const m = parseFloat(t.monto||0);
     if (t.tipo === 'ef-banco') { caja -= m; banco += m; }
     else { banco -= m; caja += m; }
@@ -3569,6 +3615,30 @@ function editarCliente(id) {
 }
 
 
+function guardarParametros() {
+  const fecha = document.getElementById('param-fecha-apertura').value;
+  const caja  = parseFloat(document.getElementById('param-saldo-caja').value||0);
+  const banco = parseFloat(document.getElementById('param-saldo-banco').value||0);
+  if (!state.parametros) state.parametros = {};
+  state.parametros.saldoInicialCaja  = caja;
+  state.parametros.saldoInicialBanco = banco;
+  state.parametros.fechaApertura     = fecha;
+  save();
+  updateTopbar();
+  const res = document.getElementById('param-resultado');
+  if (res) { res.style.display='inline'; setTimeout(()=>res.style.display='none',3000); }
+  renderParamPreview();
+  showToast('✓ Saldo de apertura guardado');
+}
+
+function renderParamPreview() {
+  const s = calcSaldos();
+  const pc = document.getElementById('param-preview-caja');
+  const pb = document.getElementById('param-preview-banco');
+  if (pc) { pc.textContent = fmt(s.caja);  pc.style.color = s.caja>=0?'var(--green)':'var(--red)'; }
+  if (pb) { pb.textContent = fmt(s.banco); pb.style.color = s.banco>=0?'#5090e0':'var(--red)'; }
+}
+
 function calcSaldoProv(id) {
   return state.gastos.filter(g=>g.provId===id).reduce((a,b)=>a+parseFloat(b.monto||0),0);
 }
@@ -3666,6 +3736,16 @@ function verMovsProv(provId) {
 
 // ========================= LOCALES =========================
 function renderLocales() {
+  // Llenar campos de apertura
+  const p = state.parametros || {};
+  const fp = document.getElementById('param-fecha-apertura');
+  const sc = document.getElementById('param-saldo-caja');
+  const sb = document.getElementById('param-saldo-banco');
+  if (fp && !fp.value) fp.value = p.fechaApertura || '';
+  if (sc && !sc.value) sc.value = p.saldoInicialCaja || '';
+  if (sb && !sb.value) sb.value = p.saldoInicialBanco || '';
+  renderParamPreview();
+
   const grid = document.getElementById('grid-locales');
   if (state.locales.length === 0) {
     grid.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">🏪</div><p>Agregá tus locales para comenzar</p></div>';
@@ -4432,6 +4512,7 @@ Object.assign(window, {
   eliminarCat, eliminarSubcat,
   openModalCat, openModalSubcat,
   del, renderCajas, renderCategorias, renderLocales, renderObligaciones,
+  guardarParametros, renderParamPreview,
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
