@@ -4007,7 +4007,8 @@ function toggleOblDia() {
   document.getElementById('obl-dia-wrap-semanal').style.display = freq==='semanal' ? '' : 'none';
 }
 
- onOblProvSearch(); document.getElementById('obl-proveedor-dropdown').style.display='block'; }
+function showOblProvDropdown() {
+  onOblProvSearch(); document.getElementById('obl-proveedor-dropdown').style.display='block'; }
 function hideOblProvDropdown() { const d=document.getElementById('obl-proveedor-dropdown'); if(d) d.style.display='none'; }
 function selectOblProv(id, nombre) {
   document.getElementById('obl-proveedor-search').value = nombre;
