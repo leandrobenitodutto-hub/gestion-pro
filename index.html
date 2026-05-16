@@ -195,6 +195,9 @@
   input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   select option { background: var(--surface2); }
   textarea { resize: vertical; min-height: 70px; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
 
   /* MODAL */
   .modal-overlay {
@@ -4443,9 +4446,9 @@ function cajRenderGastos() {
           'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px" '+
           'oninput="cajGastoChange(\''+g.id+'\',\'desc\',this.value)">'+
       '</div>'+
-      '<input type="number" placeholder="Monto" value="'+(g.monto||'')+'" min="0" step="0.01" '+
-        'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:13px;font-family:monospace" '+
-        'oninput="cajGastoChange(\''+g.id+'\',\'monto\',parseFloat(this.value)||0)">'+
+      '<input type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Monto" value="'+(g.monto||'')+'" '+
+        'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:13px;font-family:monospace;-moz-appearance:textfield" '+
+        'oninput="cajGastoChange(\''+g.id+'\',\'monto\',parseFloat(this.value.replace(/[^0-9.]/g,\'\'))||0)">'+
       '<button type="button" onclick="cajEliminarGasto(\''+g.id+'\')" '+
         'style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--red);cursor:pointer;padding:4px 8px;font-size:14px">✕</button>'+
     '</div>';
