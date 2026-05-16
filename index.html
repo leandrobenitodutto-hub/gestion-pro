@@ -2064,7 +2064,9 @@ function renderDashboard() {
   const gasSem  = state.gastos.filter(g=>g.fecha>=d1Sem&&g.fecha<=d2Sem).reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const oblSem  = state.oblInstancias.filter(i=>i.estado==='pagado'&&i.fechaPago>=d1Sem&&i.fechaPago<=d2Sem).reduce((a,b)=>a+parseFloat(b.montoPagado||b.monto||0),0);
   const resSem  = ingSem - gasSem - oblSem;
-  const oblPendSem = state.oblInstancias.filter(i=>i.periodo===mes&&i.estado==='pendiente');
+  const oblPendSem = state.oblInstancias.filter(i=>
+    i.estado==='pendiente' && i.fechaVto && i.fechaVto>=d1Sem && i.fechaVto<=d2Sem
+  );
   const totalOblPend = oblPendSem.reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const fmtLunes = lunesSem.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
   const fmtDom   = domSem.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
