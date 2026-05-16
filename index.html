@@ -2602,7 +2602,7 @@ function toggleInstancias() {
   if (arrow) arrow.textContent = open ? '▼' : '▲';
 }
 
-
+function generarInstancias() {
   const periodo = document.getElementById('obl-periodo-sel')?.value || thisMonth();
   const [y,m] = periodo.split('-').map(Number);
   const label = new Date(y,m-1,1).toLocaleString('es-AR',{month:'long',year:'numeric'});
