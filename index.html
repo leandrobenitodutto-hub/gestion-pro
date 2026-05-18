@@ -1072,7 +1072,7 @@
             </div>
             <div class="form-group" style="margin:0">
               <label>Categoría</label>
-              <select id="an-cat" onchange="anFillSubcat();renderAnalisis()">
+              <select id="an-cat" onchange="anFillSubcat();renderAnalisis()" onfocus="anFillCat()" onclick="anFillCat()">
                 <option value="">— Todas —</option>
               </select>
             </div>
@@ -3997,7 +3997,6 @@ function verMovsProv(provId) {
 
 // ========================= ANÁLISIS =========================
 function initAnalisis() {
-  // Categorías — unión de gastos e ingresos
   const catSel = document.getElementById('an-cat');
   if (!catSel) return;
   const todasCats = [...new Set([
@@ -4006,24 +4005,39 @@ function initAnalisis() {
   ].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   catSel.innerHTML = '<option value="">— Todas —</option>' +
     todasCats.map(c=>`<option value="${c}">${c}</option>`).join('');
-
-  // Locales
   const locSel = document.getElementById('an-local');
   if (locSel) locSel.innerHTML = '<option value="">— Todos —</option>' +
     [...state.locales].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
       .map(l=>`<option value="${l.id}">${l.nombre}</option>`).join('');
-
-  // Fechas default solo si están vacías
   const desde = document.getElementById('an-desde');
   const hasta  = document.getElementById('an-hasta');
   if (desde && !desde.value) desde.value = thisMonth()+'-01';
   if (hasta  && !hasta.value)  hasta.value  = today();
-
   anFillSubcat();
   renderAnalisis();
 }
 
-function anFillSubcat() {
+function anFillCat() {
+  const catSel = document.getElementById('an-cat');
+  if (!catSel || catSel.options.length > 1) return; // ya cargado
+  const todasCats = [...new Set([
+    ...state.gastos.map(g=>g.cat),
+    ...state.ingresos.map(i=>i.cat),
+  ].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const cur = catSel.value;
+  catSel.innerHTML = '<option value="">— Todas —</option>' +
+    todasCats.map(c=>`<option value="${c}"${c===cur?' selected':''}>${c}</option>`).join('');
+  // Locales también
+  const locSel = document.getElementById('an-local');
+  if (locSel && locSel.options.length <= 1) {
+    const curLoc = locSel.value;
+    locSel.innerHTML = '<option value="">— Todos —</option>' +
+      [...state.locales].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
+        .map(l=>`<option value="${l.id}"${l.id===curLoc?' selected':''}>${l.nombre}</option>`).join('');
+  }
+}
+
+
   const cat = document.getElementById('an-cat')?.value;
   const sel = document.getElementById('an-subcat');
   if (!sel) return;
@@ -5099,7 +5113,7 @@ Object.assign(window, {
   openModalCat, openModalSubcat,
   del, renderCajas, renderCategorias, renderLocales, renderObligaciones,
   guardarParametros, renderParamPreview,
-  initAnalisis, renderAnalisis, limpiarAnalisis, anFillSubcat, anProvSearch, anSelectProv, anHideProv,
+  initAnalisis, renderAnalisis, limpiarAnalisis, anFillCat, anFillSubcat, anProvSearch, anSelectProv, anHideProv,
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
