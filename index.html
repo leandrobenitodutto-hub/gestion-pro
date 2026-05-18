@@ -4641,7 +4641,8 @@ function onOblProvSearch() {
       'style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center" '+
       'onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'">' +
       '<span>'+hl+'</span>'+cat+'</div>';
-  }).join('') || '<div style="padding:10px;color:var(--text3);font-size:13px">Sin resultados</div>';
+  }).join('') + '<div onmousedown="agregarProvRapido(\'obl\') style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span>＋</span> Agregar nuevo proveedor</div>'
+    || '<div style="padding:10px;color:var(--text3);font-size:13px">Sin resultados</div>' + '<div onmousedown="agregarProvRapido(\'obl\') style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span>＋</span> Agregar nuevo proveedor</div>';
   dd.style.display = 'block';
 }
 
@@ -4666,7 +4667,7 @@ function onGasProvSearch() {
   const sorted = [...state.proveedores].sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
   const filtered = q ? sorted.filter(function(p){return p.nombre.toLowerCase().includes(q);}) : sorted;
   if (!filtered.length) {
-    dd.innerHTML = '<div style="padding:10px;color:var(--text3);font-size:13px">Sin resultados</div>';
+    dd.innerHTML = '<div style="padding:10px;color:var(--text3);font-size:13px">Sin resultados</div>' + '<div onmousedown="agregarProvRapido(\'gas\') style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span style=\'font-size:16px\'>＋</span> Agregar nuevo proveedor</div>';
   } else {
     dd.innerHTML = filtered.slice(0,60).map(function(p) {
       var hl = q ? p.nombre.replace(new RegExp('('+q+')', 'gi'), '<strong style="color:var(--accent)">$1</strong>') : p.nombre;
@@ -4676,7 +4677,7 @@ function onGasProvSearch() {
         'style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center" ' +
         'onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'">' +
         '<span>'+hl+'</span>'+cat+'</div>';
-    }).join('');
+    }).join('') + '<div onmousedown="agregarProvRapido(\'gas\') style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span style=\'font-size:16px\'>＋</span> Agregar nuevo proveedor</div>';
   }
   dd.style.display = 'block';
   // Clear hidden id if typing something that doesn't match
@@ -5009,6 +5010,26 @@ function saveCaja() {
   cajRecalc();
 }
 
+
+function agregarProvRapido(contexto) {
+  // Pre-fill nombre from search input
+  const searchMap = {
+    gas: 'gas-proveedor-search',
+    obl: 'obl-proveedor-search',
+    ing: 'ing-proveedor',
+    an:  'an-prov-search',
+  };
+  const nombre = (document.getElementById(searchMap[contexto]||'')?.value||'').trim();
+  openModal('modal-proveedor');
+  setTimeout(function() {
+    const np = document.getElementById('prov-nombre');
+    if (np && nombre) np.value = nombre;
+    // After save, re-trigger the dropdown search
+    const origSave = window._provSaveCallback;
+    window._provSaveCallback = contexto;
+  }, 100);
+}
+
 function saveProveedor() {
   const editId = document.getElementById('prov-id').value;
   const data = {
@@ -5023,12 +5044,21 @@ function saveProveedor() {
     subcat:  document.getElementById('prov-subcat')?.value||'',
   };
   if (!data.nombre) return alert('Ingresá el nombre del proveedor');
+  let newId = editId;
   if (editId) {
     const o=state.proveedores.find(x=>x.id===editId); if(o) Object.assign(o,data);
   } else {
-    state.proveedores.push({id:uid(),...data});
+    newId = uid();
+    state.proveedores.push({id:newId,...data});
   }
   save(); closeModal('modal-proveedor'); renderProveedores();
+  // Si vino desde un dropdown de búsqueda, auto-seleccionar el nuevo proveedor
+  const ctx = window._provSaveCallback;
+  if (ctx && newId) {
+    if (ctx==='gas') { selectGasProv(newId, data.nombre); }
+    else if (ctx==='obl') { selectOblProv(newId, data.nombre); }
+    window._provSaveCallback = null;
+  }
   ['prov-nombre','prov-cuit','prov-rubro','prov-contacto','prov-tel','prov-email','prov-dir'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
@@ -5115,7 +5145,7 @@ Object.assign(window, {
   guardarParametros, renderParamPreview,
   initAnalisis, renderAnalisis, limpiarAnalisis, anFillCat, anFillSubcat, anProvSearch, anSelectProv, anHideProv,
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
-  onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv,
+  onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv, agregarProvRapido,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
   autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleInstancias, setInstFilter, setInstFreq,
   cajRecalc, cajCheckGastos, cajAgregarGasto, cajEliminarGasto, cajGastoChange, cajSetMonto, cajSetDesc, renderFlujo, abrirAjusteObl, guardarAjusteObl,
