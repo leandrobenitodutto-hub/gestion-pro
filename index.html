@@ -4641,8 +4641,8 @@ function onOblProvSearch() {
       'style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center" '+
       'onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'">' +
       '<span>'+hl+'</span>'+cat+'</div>';
-  }).join('') + '<div onmousedown="agregarProvRapido(\'obl\') style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span>＋</span> Agregar nuevo proveedor</div>'
-    || '<div style="padding:10px;color:var(--text3);font-size:13px">Sin resultados</div>' + '<div onmousedown="agregarProvRapido(\'obl\') style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span>＋</span> Agregar nuevo proveedor</div>';
+  }).join('') + '<div onmousedown="agregarProvRapido(\'obl\')" style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span>＋</span> Agregar nuevo proveedor</div>'
+    || '<div style="padding:10px;color:var(--text3);font-size:13px">Sin resultados</div>' + '<div onmousedown="agregarProvRapido(\'obl\')" style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span>＋</span> Agregar nuevo proveedor</div>';
   dd.style.display = 'block';
 }
 
@@ -4667,7 +4667,7 @@ function onGasProvSearch() {
   const sorted = [...state.proveedores].sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');});
   const filtered = q ? sorted.filter(function(p){return p.nombre.toLowerCase().includes(q);}) : sorted;
   if (!filtered.length) {
-    dd.innerHTML = '<div style="padding:10px;color:var(--text3);font-size:13px">Sin resultados</div>' + '<div onmousedown="agregarProvRapido(\'gas\') style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span style=\'font-size:16px\'>＋</span> Agregar nuevo proveedor</div>';
+    dd.innerHTML = '<div style="padding:10px;color:var(--text3);font-size:13px">Sin resultados</div>' + '<div onmousedown="agregarProvRapido(\'gas\')" style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span style=\'font-size:16px\'>＋</span> Agregar nuevo proveedor</div>';
   } else {
     dd.innerHTML = filtered.slice(0,60).map(function(p) {
       var hl = q ? p.nombre.replace(new RegExp('('+q+')', 'gi'), '<strong style="color:var(--accent)">$1</strong>') : p.nombre;
@@ -4677,7 +4677,7 @@ function onGasProvSearch() {
         'style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center" ' +
         'onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'">' +
         '<span>'+hl+'</span>'+cat+'</div>';
-    }).join('') + '<div onmousedown="agregarProvRapido(\'gas\') style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span style=\'font-size:16px\'>＋</span> Agregar nuevo proveedor</div>';
+    }).join('') + '<div onmousedown="agregarProvRapido(\'gas\')" style="padding:8px 12px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);display:flex;align-items:center;gap:6px;font-weight:600" onmouseenter="this.style.background=\'var(--surface)\'" onmouseleave="this.style.background=\'\'"><span style=\'font-size:16px\'>＋</span> Agregar nuevo proveedor</div>';
   }
   dd.style.display = 'block';
   // Clear hidden id if typing something that doesn't match
