@@ -2835,7 +2835,13 @@ function renderObligaciones() {
     const tbody = document.getElementById(tbodyId);
     if (!list.length) { tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty"><p>Sin plantillas</p></div></td></tr>`; return; }
     const diasNombre = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-    tbody.innerHTML = list.map(o=>`<tr>
+    // Ordenar por día/fecha de vencimiento
+    const sorted = [...list].sort((a,b)=>{
+      const va = a.freq==='mensual' ? parseInt(a.dia||99) : a.freq==='unica' ? (a.fechaUnica||'9999') : parseInt(a.diaSemana??7);
+      const vb = b.freq==='mensual' ? parseInt(b.dia||99) : b.freq==='unica' ? (b.fechaUnica||'9999') : parseInt(b.diaSemana??7);
+      return va > vb ? 1 : va < vb ? -1 : (a.desc||'').localeCompare(b.desc||'','es');
+    });
+    tbody.innerHTML = sorted.map(o=>`<tr>
       <td>
         <div style="font-weight:600;font-size:13px">${o.desc}</div>
         <div style="font-size:11px;color:var(--text3)">${o.cat||''}${o.subcat?' › '+o.subcat:''}</div>
