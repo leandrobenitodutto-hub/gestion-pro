@@ -2339,13 +2339,14 @@ function renderDashboard() {
 
   // Resultado semana actual
   const hoy = today();
-  const hoyDate = new Date(hoy);
+  const hoyDate = new Date(hoy+'T12:00:00');
   // Encontrar lunes de la semana actual
   const diaSem = hoyDate.getDay() === 0 ? 6 : hoyDate.getDay() - 1;
   const lunesSem = new Date(hoyDate); lunesSem.setDate(hoyDate.getDate() - diaSem);
   const domSem = new Date(lunesSem); domSem.setDate(lunesSem.getDate() + 6);
-  const d1Sem = lunesSem.toISOString().slice(0,10);
-  const d2Sem = domSem.toISOString().slice(0,10);
+  const toLS = d => d.getFullYear()+'-'+(d.getMonth()+1+'').padStart(2,'0')+'-'+(d.getDate()+'').padStart(2,'0');
+  const d1Sem = toLS(lunesSem);
+  const d2Sem = toLS(domSem);
   const ingSem  = state.cajas.filter(c=>c.fecha>=d1Sem&&c.fecha<=d2Sem).reduce((a,b)=>a+parseFloat(b.totalReal||0),0)
                 + state.ingresos.filter(i=>i.fecha>=d1Sem&&i.fecha<=d2Sem).reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const gasSem  = state.gastos.filter(g=>g.fecha>=d1Sem&&g.fecha<=d2Sem).reduce((a,b)=>a+parseFloat(b.monto||0),0);
@@ -2366,8 +2367,8 @@ function renderDashboard() {
     return false;
   });
   const totalOblPend = oblPendSem.reduce((a,b)=>a+parseFloat(b.monto||0),0);
-  const fmtLunes = lunesSem.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
-  const fmtDom   = domSem.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
+  const fmtLunes = lunesSem.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',timeZone:'America/Argentina/Buenos_Aires'});
+  const fmtDom   = domSem.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',timeZone:'America/Argentina/Buenos_Aires'});
 
   document.getElementById('dash-cajas-locales').innerHTML = `
     <div style="margin-bottom:10px">
@@ -2833,6 +2834,7 @@ function renderObligaciones() {
         `<td style="font-size:12px;color:var(--text3)">${o.diaSemana!=null&&o.diaSemana!==''?diasNombre[o.diaSemana]:'—'}</td>`}
       <td class="mono hide-mobile" style="color:var(--red)">${fmt(o.monto)}</td>
       <td style="display:flex;gap:4px">
+        <button class="btn btn-icon btn-sm" title="Generar en período actual" onclick="generarUnaInstancia('${o.id}')">⚡</button>
         <button class="btn btn-icon btn-sm" onclick="editarObl('${o.id}')">✏</button>
         <button class="btn btn-icon btn-sm" onclick="verHistorialObl('${o.id}')">📋</button>
         <button class="btn btn-icon btn-sm" onclick="del('obligaciones','${o.id}');renderObligaciones()">🗑</button>
@@ -2893,7 +2895,80 @@ function toggleInstancias() {
   if (arrow) arrow.textContent = open ? '▼' : '▲';
 }
 
-function generarInstancias() {
+function generarUnaInstancia(oblId) {
+  const obl = state.obligaciones.find(o=>o.id===oblId);
+  if (!obl) return;
+  const periodo = document.getElementById('obl-periodo-sel')?.value || thisMonth();
+  const [y,m] = periodo.split('-').map(Number);
+  const pad = n=>String(n).padStart(2,'0');
+
+  // Verificar si ya existe una instancia para esta obligación en este período
+  const yaExiste = state.oblInstancias.find(i=>i.oblId===oblId && i.periodo===periodo);
+  if (yaExiste) {
+    if (!confirm('Ya existe una instancia de "'+obl.desc+'" para '+periodo+'.\n¿Querés crear otra igual?')) return;
+  }
+
+  let fechaVto = '';
+  let semLabel = '';
+
+  if (obl.freq === 'mensual') {
+    const dia = parseInt(obl.dia||1);
+    const diasMes = new Date(y, m, 0).getDate();
+    fechaVto = y+'-'+pad(m)+'-'+pad(Math.min(dia, diasMes));
+  } else if (obl.freq === 'semanal') {
+    // Calcular la próxima semana desde hoy dentro del período
+    const hoy = today();
+    const [yH,mH,dH] = hoy.split('-').map(Number);
+    // Encontrar el próximo lunes en el período
+    let diaLun = 1;
+    for (let d=1; d<=new Date(y,m,0).getDate(); d++) {
+      if (new Date(y,m-1,d).getDay() === 1) {
+        // Es un lunes — es esta semana si incluye hoy o es futura
+        const lunesStr = y+'-'+pad(m)+'-'+pad(d);
+        if (lunesStr >= hoy.slice(0,8)+pad(dH-(new Date(hoy+'T12:00:00').getDay()===0?6:new Date(hoy+'T12:00:00').getDay()-1))) {
+          diaLun = d; break;
+        }
+      }
+    }
+    // Semana más cercana a hoy
+    const diasMes = new Date(y,m,0).getDate();
+    let semNum = 0;
+    let chosenLun = 1;
+    for (let d=1; d<=diasMes; d++) {
+      if (new Date(y,m-1,d).getDay()===1) {
+        semNum++;
+        const lunesStr = y+'-'+pad(m)+'-'+pad(d);
+        if (lunesStr >= hoy) { chosenLun = d; break; }
+        chosenLun = d;
+      }
+    }
+    const hasta = Math.min(chosenLun+6, diasMes);
+    semLabel = 'Sem '+semNum+' ('+pad(chosenLun)+'/'+pad(m)+'-'+pad(hasta)+'/'+pad(m)+')';
+    // fechaVto por día configurado
+    if (obl.diaSemana != null && obl.diaSemana !== '') {
+      const offset = parseInt(obl.diaSemana)===0 ? 6 : parseInt(obl.diaSemana)-1;
+      const dVto = new Date(y,m-1,chosenLun+offset);
+      fechaVto = dVto.getFullYear()+'-'+pad(dVto.getMonth()+1)+'-'+pad(dVto.getDate());
+    } else {
+      fechaVto = y+'-'+pad(m)+'-'+pad(chosenLun);
+    }
+  } else if (obl.freq === 'unica') {
+    fechaVto = obl.fechaUnica || '';
+  }
+
+  state.oblInstancias.push({
+    id: uid(), oblId, oblDesc: obl.desc,
+    periodo, monto: parseFloat(obl.monto||0),
+    pago: obl.pago||'efectivo', localId: obl.localId||null,
+    estado: 'pendiente', semLabel, fechaVto,
+  });
+
+  save();
+  renderObligaciones();
+  showToast('✓ "'+obl.desc+'" agregada al período '+periodo);
+}
+
+
   const periodo = document.getElementById('obl-periodo-sel')?.value || thisMonth();
   const [y,m] = periodo.split('-').map(Number);
   const label = new Date(y,m-1,1).toLocaleString('es-AR',{month:'long',year:'numeric'});
@@ -5134,7 +5209,7 @@ Object.assign(window, {
   saveIngreso, saveGasto, saveCheque, saveObligacion, saveCaja,
   saveProveedor, saveCliente, saveLocal, saveCategoria, saveSubcategoria,
   marcarCobrado, pagarObl, confirmarPagoObl, despagarObl,
-  pagarInstancia, despagarInstancia, saltarInstancia, reactivarInstancia, generarInstancias, verHistorialObl,
+  pagarInstancia, despagarInstancia, saltarInstancia, reactivarInstancia, generarInstancias, generarUnaInstancia, verHistorialObl,
   editarInstancia, guardarEditInstancia,
   editarMov, editarCheque, editarCaja, editarProveedor, editarCliente,
   verMovsProv,
