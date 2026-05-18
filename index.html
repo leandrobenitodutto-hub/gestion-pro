@@ -3997,31 +3997,43 @@ function verMovsProv(provId) {
 
 // ========================= ANÁLISIS =========================
 function initAnalisis() {
-  // Llenar categorías
+  // Categorías — unión de gastos e ingresos
   const catSel = document.getElementById('an-cat');
   if (!catSel) return;
+  const todasCats = [...new Set([
+    ...state.gastos.map(g=>g.cat),
+    ...state.ingresos.map(i=>i.cat),
+  ].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   catSel.innerHTML = '<option value="">— Todas —</option>' +
-    state.categorias.map(c=>`<option value="${c.nombre}">${c.nombre}</option>`).join('');
-  // Llenar locales
+    todasCats.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+  // Locales
   const locSel = document.getElementById('an-local');
   if (locSel) locSel.innerHTML = '<option value="">— Todos —</option>' +
-    state.locales.map(l=>`<option value="${l.id}">${l.nombre}</option>`).join('');
-  // Fechas default: inicio de mes hasta hoy
+    [...state.locales].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
+      .map(l=>`<option value="${l.id}">${l.nombre}</option>`).join('');
+
+  // Fechas default solo si están vacías
   const desde = document.getElementById('an-desde');
   const hasta  = document.getElementById('an-hasta');
   if (desde && !desde.value) desde.value = thisMonth()+'-01';
-  if (hasta && !hasta.value) hasta.value = today();
+  if (hasta  && !hasta.value)  hasta.value  = today();
+
   anFillSubcat();
   renderAnalisis();
 }
 
 function anFillSubcat() {
-  const cat    = document.getElementById('an-cat')?.value;
-  const catObj = state.categorias.find(c=>c.nombre===cat);
-  const sel    = document.getElementById('an-subcat');
+  const cat = document.getElementById('an-cat')?.value;
+  const sel = document.getElementById('an-subcat');
   if (!sel) return;
+  // Buscar subcategorías reales en los movimientos
+  const subs = [...new Set([
+    ...state.gastos.filter(g=>!cat||g.cat===cat).map(g=>g.subcat),
+    ...state.ingresos.filter(i=>!cat||i.cat===cat).map(i=>i.subcat),
+  ].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   sel.innerHTML = '<option value="">— Todas —</option>' +
-    (catObj?.subs||[]).map(s=>`<option value="${s}">${s}</option>`).join('');
+    subs.map(s=>`<option value="${s}">${s}</option>`).join('');
 }
 
 function anProvSearch() {
