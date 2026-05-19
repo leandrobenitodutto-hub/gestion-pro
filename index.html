@@ -3630,12 +3630,18 @@ function renderFlujo() {
     detail.id = semId;
     detail.style.cssText = 'display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px';
 
-    // Instancias semanales — solo las pendientes
+    // Instancias semanales — pendientes primero, pagadas al fondo
     if (instSemFilt.length > 0) {
+      const instOrdenadas = [...instSemFilt].sort(function(a,b){
+        const pa = a.estado==='pendiente' ? 0 : a.estado==='saltado' ? 1 : 2;
+        const pb = b.estado==='pendiente' ? 0 : b.estado==='saltado' ? 1 : 2;
+        if (pa !== pb) return pa - pb;
+        return (a.fechaVto||'') > (b.fechaVto||'') ? 1 : -1;
+      });
       const sec = document.createElement('div');
       sec.style.marginBottom = '12px';
       sec.innerHTML = '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px;font-weight:700">📆 Obligaciones de la semana</div>';
-      instSemFilt.forEach(function(inst) {
+      instOrdenadas.forEach(function(inst) {
         const obl = state.obligaciones.find(o=>o.id===inst.oblId)||{};
         const row = document.createElement('div');
         row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)';
@@ -3653,7 +3659,8 @@ function renderFlujo() {
         const monto = document.createElement('span');
         monto.className = 'mono';
         monto.style.color = inst.estado==='pagado' ? 'var(--text3)' : 'var(--red)';
-        monto.textContent = fmt(inst.monto);
+        // Mostrar montoPagado si fue modificado, sino el monto original
+        monto.textContent = inst.estado==='pagado' ? fmt(inst.montoPagado||inst.monto) : fmt(inst.monto);
         right.appendChild(monto);
         if (inst.estado==='pendiente') {
           const btnPagar = document.createElement('button');
