@@ -2321,14 +2321,33 @@ function renderDashboard() {
   const chqPendMes  = state.cheques.filter(c=>c.cobro&&c.cobro.startsWith(mes)&&c.estado==='pendiente'&&c.tipo==='emitido').reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const egresosProy = egresosReales + oblPendMes + chqPendMes;
 
-  // ── Ingresos proyectados — usar renderFlujo semanas si disponible ──
-  // Estimación simple: promedio diario de lo que va del mes × días del mes
+  // ── Ingresos proyectados — promedio de las últimas 4 semanas completas de cajas × semanas del mes ──
   const hoyN = today();
   const [yM,mM] = mes.split('-').map(Number);
+  const hoyDateDash = new Date(hoyN+'T12:00:00');
+  const diaSemDash = hoyDateDash.getDay()===0 ? 6 : hoyDateDash.getDay()-1;
+  const lunesDash = new Date(hoyDateDash);
+  lunesDash.setDate(hoyDateDash.getDate()-diaSemDash);
+  const toStrDash = d => d.getFullYear()+'-'+(d.getMonth()+1+'').padStart(2,'0')+'-'+(d.getDate()+'').padStart(2,'0');
+
+  // Calcular promedio últimas 4 semanas completas de cajas
+  const totalesDash = [];
+  for (let ww=1; ww<=4; ww++) {
+    const lunW = new Date(lunesDash); lunW.setDate(lunesDash.getDate()-7*ww);
+    const domW = new Date(lunW); domW.setDate(lunW.getDate()+6);
+    const d1W = toStrDash(lunW), d2W = toStrDash(domW);
+    const totalW = state.cajas.filter(c=>c.fecha>=d1W&&c.fecha<=d2W).reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
+    if (totalW > 0) totalesDash.push(totalW);
+  }
+  const promSemanal = totalesDash.length > 0
+    ? Math.round(totalesDash.reduce((a,b)=>a+b,0)/totalesDash.length)
+    : 0;
+
+  // Cantidad de semanas en el mes (lunes dentro del mes)
   const diasMesTotal = new Date(yM, mM, 0).getDate();
-  const diasTranscurridos = parseInt(hoyN.slice(8)) || 1;
-  const promDiario = diasTranscurridos > 0 ? ingRealesMes / diasTranscurridos : 0;
-  const ingProyMes = Math.round(promDiario * diasMesTotal);
+  let semsMes = 0;
+  for (let d=1; d<=diasMesTotal; d++) { if (new Date(yM,mM-1,d).getDay()===1) semsMes++; }
+  const ingProyMes = promSemanal * semsMes;
 
   // Resultados
   const resultadoReal = ingRealesMes - egresosReales;
