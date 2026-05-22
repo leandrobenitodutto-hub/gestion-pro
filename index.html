@@ -3531,9 +3531,9 @@ function renderFlujo() {
       semPasada:semPasada, semActual:semActual, ingProyectado:ingProyectado, nSems:nSemsRef});
   }
 
-  // Total proyectado del mes: todas las semanas usan el mismo promedio proyectado
+  // Total proyectado del mes: semanas pasadas usan real, resto usan proyectado
   const totalIngProyectado = semanas.reduce(function(a,s) {
-    return a + (s.ingProyectado > 0 ? s.ingProyectado : s.ing);
+    return a + (s.semPasada ? s.ing : (s.ingProyectado > 0 ? s.ingProyectado : s.ing));
   }, 0);
   const elProy = document.getElementById('flujo-ing-proyectado');
   if (elProy) {
@@ -3556,16 +3556,23 @@ function renderFlujo() {
       ? s.instSem.filter(function(i){ return (i.oblDesc||'').toLowerCase().includes(flujoQ); })
       : s.instSem;
     const totalGastos = s.gasPag + s.oblPend + s.chqPend;
-    // Todas las semanas usan el ingreso proyectado (promedio últimas 4 semanas completas)
-    const ingParaCalculo = s.ingProyectado > 0 ? s.ingProyectado : s.ing;
-    acum += ingParaCalculo - totalGastos;
-    const res2 = ingParaCalculo - totalGastos;
+    // Semanas pasadas: ingreso y resultado reales. Semana actual y futuras: proyectado
+    const ingParaCalculo = s.semPasada
+      ? s.ing  // real: cajas + ingresos de esa semana
+      : (s.ingProyectado > 0 ? s.ingProyectado : s.ing);
+    const gasParaCalculo = s.semPasada
+      ? s.gasPag  // solo gastos reales pagados (no pendientes)
+      : totalGastos;
+    acum += ingParaCalculo - gasParaCalculo;
+    const res2 = ingParaCalculo - gasParaCalculo;
     const semId = 'sem-det-' + s.semKey;
     const pendCount = instSemFilt.filter(i=>i.estado==='pendiente').length;
 
-    // Label ingreso — proyectado para todas, con el real como referencia secundaria
+    // Label ingreso según estado de la semana
     let ingLabel;
-    if (s.ingProyectado > 0) {
+    if (s.semPasada) {
+      ingLabel = '<span style="color:var(--green)">↑ '+fmt(s.ing)+'</span> <span style="font-size:10px;color:var(--text3)">real</span>';
+    } else if (s.ingProyectado > 0) {
       ingLabel = '<span style="color:#5090e0">↑ '+fmt(s.ingProyectado)+'</span> <span style="font-size:10px;color:var(--text3)">proyectado (prom. '+s.nSems+' sem.)</span>';
       if (s.ing > 0) {
         ingLabel += ' <span style="font-size:10px;color:var(--green)">· real: '+fmt(s.ing)+'</span>';
@@ -3594,7 +3601,7 @@ function renderFlujo() {
     subtitle.style.cssText = 'font-size:12px;color:var(--text2);margin-top:2px';
     subtitle.innerHTML = ingLabel +
       ' <span style="color:var(--border)">|</span> ' +
-      '<span style="color:var(--red)">↓ '+fmt(totalGastos)+'</span>' +
+      '<span style="color:var(--red)">↓ '+fmt(s.semPasada ? s.gasPag : totalGastos)+'</span>' +
       ' <span style="color:var(--border)">|</span> ' +
       '<span style="color:'+(res2>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(res2>=0?'+':'')+fmt(res2)+'</span>' +
       (pendCount > 0 ? ' <span style="color:var(--orange)">⚠ '+pendCount+' pendientes</span>' :
