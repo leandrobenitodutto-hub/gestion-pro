@@ -698,6 +698,19 @@
           <span class="pill" onclick="filterCheques('pendiente',this)">Pendientes</span>
           <span class="pill" onclick="filterCheques('cobrado',this)">Cobrados</span>
         </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+          <input type="text" id="chq-search" placeholder="🔍 Buscar proveedor / titular / N°..."
+            oninput="renderCheques()"
+            style="flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 12px;font-size:13px">
+          <div style="display:flex;gap:6px;align-items:center">
+            <label style="font-size:12px;color:var(--text3)">Cobro desde</label>
+            <input type="date" id="chq-desde" onchange="renderCheques()" style="width:auto">
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <label style="font-size:12px;color:var(--text3)">hasta</label>
+            <input type="date" id="chq-hasta" onchange="renderCheques()" style="width:auto">
+          </div>
+        </div>
         <div class="card" style="margin-bottom:12px" id="chq-stat-total"></div>
         <div class="card">
           <div class="table-wrap">
@@ -2637,6 +2650,23 @@ function filterCheques(val, el) {
 function renderCheques() {
   let data = [...state.cheques].sort((a,b)=>a.cobro>b.cobro?1:-1);
   if (chqFilter !== 'todos') data = data.filter(c=>c.tipo===chqFilter||c.estado===chqFilter);
+  // Buscador y filtro de fecha
+  const chqQ = (document.getElementById('chq-search')?.value||'').toLowerCase().trim();
+  const chqDesde = document.getElementById('chq-desde')?.value || '';
+  const chqHasta = document.getElementById('chq-hasta')?.value || '';
+  if (chqQ) {
+    data = data.filter(c=>{
+      const prov = (state.proveedores.find(p=>p.id===c.provId)?.nombre||'').toLowerCase();
+      return (c.titular||'').toLowerCase().includes(chqQ) ||
+             prov.includes(chqQ) ||
+             (c.numero+'').toLowerCase().includes(chqQ) ||
+             (c.banco||'').toLowerCase().includes(chqQ);
+    });
+  }
+  if (chqDesde) data = data.filter(c=>c.cobro && c.cobro >= chqDesde);
+  if (chqHasta) data = data.filter(c=>c.cobro && c.cobro <= chqHasta);
+  // Ordenar por fecha de cobro
+  data = [...data].sort((a,b)=>(a.cobro||'')>(b.cobro||'')?1:-1);
   // Actualizar tarjeta de totales
   const totalMonto = data.reduce((a,b)=>a+parseFloat(b.monto||0),0);
   const hoy = today();
@@ -2674,7 +2704,7 @@ function renderCheques() {
       <td><span class="badge ${estBadge}">${estLabel}</span></td>
       <td style="display:flex;gap:4px;flex-wrap:wrap">
         ${c.estado==='pendiente'
-          ? `<button class="btn btn-secondary btn-sm" onclick="marcarCobrado('${c.id}')">✓ Cobrar</button>`
+          ? `<button class="btn btn-secondary btn-sm" onclick="marcarCobrado('${c.id}')">✓ ${c.tipo==='emitido'?'Pagar':'Cobrar'}</button>`
           : `<button class="btn btn-sm" style="background:#2e2e38;color:var(--text2);font-size:11px" onclick="desmarcarCobrado('${c.id}')">↩ Revertir</button>`}
         <button class="btn btn-icon" onclick="editarCheque('${c.id}')">✏</button>
         <button class="btn btn-icon" onclick="del('cheques','${c.id}');renderCheques()">🗑</button>
@@ -3507,14 +3537,23 @@ function renderFlujo() {
     var sGas      = state.gastos.filter(function(g){return g.fecha>=d1&&g.fecha<=d2&&!g._oblId&&!g._chqId;}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0);
     var sOblPag   = state.gastos.filter(function(g){return g.fecha>=d1&&g.fecha<=d2&&g._oblId;}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0);
     var sChqPend  = state.cheques.filter(function(c){return c.estado==='pendiente'&&c.tipo==='emitido'&&c.cobro>=d1&&c.cobro<=d2;}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0);
-    // Instancias de esta semana: semanales con semLabel + mensuales cuya fechaVto cae en esta semana
+    // Instancias de esta semana:
+    // 1. Semanales con semLabel de esta semana
+    // 2. Cualquier instancia (mensual/única) cuya fechaVto cae dentro de esta semana
     var instSemLabel = state.oblInstancias.filter(function(i){
-      return i.periodo===mes && i.semLabel && i.semLabel.startsWith('Sem '+semNum+' ') && i.estado!=='saltado';
+      return i.periodo===mes && i.semLabel && i.semLabel.startsWith('Sem '+semNum+' ') && i.estado!=='saltado'
+        && !i.fechaVto; // las que tienen fechaVto se ubican por fecha (abajo)
     });
-    var instMenSem = state.oblInstancias.filter(function(i){
-      return i.periodo===mes && !i.semLabel && i.fechaVto && i.fechaVto>=d1 && i.fechaVto<=d2 && i.estado!=='saltado';
+    var instPorFecha = state.oblInstancias.filter(function(i){
+      return i.fechaVto && i.fechaVto>=d1 && i.fechaVto<=d2 && i.estado!=='saltado';
     });
-    var instSem = instSemLabel.concat(instMenSem).sort(function(a,b){
+    // Unir sin duplicar (por id)
+    var vistos = {};
+    var instSem = [];
+    instSemLabel.concat(instPorFecha).forEach(function(i){
+      if (!vistos[i.id]) { vistos[i.id]=true; instSem.push(i); }
+    });
+    instSem.sort(function(a,b){
       var fa = a.fechaVto || '';
       var fb = b.fechaVto || '';
       if (fa && fb) return fa > fb ? 1 : -1;
@@ -3753,94 +3792,7 @@ function renderFlujo() {
     container.appendChild(card);
   });
 
-  // Obligaciones mensuales
-  // Solo mostrar mensuales que NO tienen semLabel (no fueron asignadas a ninguna semana)
-  const instMenMes = state.oblInstancias.filter(i=>i.periodo===mes&&!i.semLabel&&i.estado!=='saltado')
-    .sort(function(a,b){ return (a.fechaVto||'') > (b.fechaVto||'') ? 1 : -1; });
-  const menCard = document.createElement('div');
-  menCard.className = 'card';
-  menCard.style.marginBottom = '12px';
-
-  if (instMenMes.length > 0) {
-    const totalMenPend = instMenMes.filter(i=>i.estado==='pendiente').reduce((a,b)=>a+parseFloat(b.monto||0),0);
-    const totalMenPag  = instMenMes.filter(i=>i.estado==='pagado').reduce((a,b)=>a+parseFloat(b.montoPagado||b.monto||0),0);
-
-    const menHeader = document.createElement('div');
-    menHeader.style.cssText = 'cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:4px 0';
-    menHeader.onclick = function() { toggleSemFlujo('flujo-mensuales'); };
-    menHeader.innerHTML = '<div>'+
-      '<div style="font-weight:700;font-size:14px">📅 Obligaciones Mensuales</div>'+
-      '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+
-        '<span style="color:var(--red)">Total: '+fmt(totalMenPend+totalMenPag)+'</span> | '+
-        '<span style="color:var(--green)">Pagado: '+fmt(totalMenPag)+'</span> | '+
-        '<span style="color:var(--orange)">Pendiente: '+fmt(totalMenPend)+'</span>'+
-      '</div></div>'+
-      '<div id="flujo-mensuales-arrow" style="font-size:18px;color:var(--text3)">▼</div>';
-
-    const menDetail = document.createElement('div');
-    menDetail.id = 'flujo-mensuales';
-    menDetail.style.cssText = 'display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px';
-
-    instMenMes.forEach(function(inst) {
-      const obl = state.obligaciones.find(o=>o.id===inst.oblId)||{};
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)';
-      const left = document.createElement('div');
-      left.innerHTML = '<div style="font-size:13px;font-weight:600">'+(inst.oblDesc||obl.desc||'-')+'</div>'+
-        '<div style="font-size:11px;color:var(--text3)">'+(obl.cat||'')+' · Día '+(obl.dia||'-')+
-        (inst.fechaVto ? ' · <span style="color:var(--accent)">Vto: '+fmtDate(inst.fechaVto)+'</span>' : '')+
-        '</div>'+
-        (inst.estado==='pagado'?'<div style="font-size:11px;color:var(--green)">✓ '+fmt(inst.montoPagado||inst.monto)+' · '+fmtDate(inst.fechaPago)+'</div>':'');
-      const right = document.createElement('div');
-      right.style.cssText = 'display:flex;align-items:center;gap:8px';
-      const monto = document.createElement('span');
-      monto.className = 'mono';
-      monto.style.cssText = 'color:'+(inst.estado==='pagado'?'var(--text3)':'var(--red)')+';font-weight:600';
-      monto.textContent = fmt(inst.monto);
-      right.appendChild(monto);
-      if (inst.estado==='pendiente') {
-        const btnPagar = document.createElement('button');
-        btnPagar.className = 'btn btn-primary btn-sm';
-        btnPagar.textContent = '✓ Pagar';
-        btnPagar.onclick = (function(id) { return function() { var open=getOpenSections(); pagarInstancia(id); renderFlujo(); restoreOpenSections(open); }; })(inst.id);
-        const btnEditar = document.createElement('button');
-        btnEditar.className = 'btn btn-sm';
-        btnEditar.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
-        btnEditar.textContent = '✏';
-        btnEditar.title = 'Editar monto de esta instancia';
-        btnEditar.onclick = (function(id) { return function() { editarInstancia(id); }; })(inst.id);
-        const btnSaltar = document.createElement('button');
-        btnSaltar.className = 'btn btn-sm';
-        btnSaltar.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
-        btnSaltar.textContent = '⊘ Saltar';
-        btnSaltar.onclick = (function(id) { return function() { var open=getOpenSections(); saltarInstancia(id); renderFlujo(); restoreOpenSections(open); }; })(inst.id);
-        right.appendChild(btnPagar);
-        right.appendChild(btnEditar);
-        right.appendChild(btnSaltar);
-      } else {
-        const badge = document.createElement('span');
-        badge.className = 'badge badge-green';
-        badge.style.fontSize = '11px';
-        badge.textContent = '✓ Pagado';
-        const btnRevertir = document.createElement('button');
-        btnRevertir.className = 'btn btn-sm';
-        btnRevertir.style.cssText = 'background:#2e2e38;color:var(--text2);font-size:11px';
-        btnRevertir.textContent = '↩';
-        btnRevertir.onclick = (function(id) { return function() { var open=getOpenSections(); despagarInstancia(id); renderFlujo(); restoreOpenSections(open); }; })(inst.id);
-        right.appendChild(badge);
-        right.appendChild(btnRevertir);
-      }
-      row.appendChild(left);
-      row.appendChild(right);
-      menDetail.appendChild(row);
-    });
-
-    menCard.appendChild(menHeader);
-    menCard.appendChild(menDetail);
-  } else {
-    menCard.innerHTML = '<div style="font-size:13px;color:var(--text3)">📅 Sin instancias mensuales — generá el período desde <strong>Obligaciones → ⚡ Generar período</strong></div>';
-  }
-  container.appendChild(menCard);
+  // (Las obligaciones mensuales/únicas ahora se muestran en su semana correspondiente por fechaVto)
 
   // Categorías ingresos
   const catIng = {};
