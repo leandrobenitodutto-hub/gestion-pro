@@ -3440,6 +3440,34 @@ function renderFlujo() {
   const semanas = [];
   var semNum = 0;
 
+  // ── PROYECCIÓN DE INGRESOS ──
+  // Promedio del total de ventas (cajas + ingresos) de las últimas 4 semanas COMPLETAS
+  // Una semana completa es lunes-domingo cuyo domingo ya pasó (es anterior a hoy)
+  var hoyFlujo = today();
+  var hoyDateFlujo = new Date(hoyFlujo + 'T12:00:00');
+  var diaSemHoy = hoyDateFlujo.getDay() === 0 ? 6 : hoyDateFlujo.getDay() - 1; // 0=lun
+  var lunesActual = new Date(hoyDateFlujo);
+  lunesActual.setDate(hoyDateFlujo.getDate() - diaSemHoy);
+  var toStrFlujo = function(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
+
+  var totalesSemanas = [];
+  for (var w = 1; w <= 4; w++) {
+    var lunW = new Date(lunesActual);
+    lunW.setDate(lunesActual.getDate() - 7*w);
+    var domW = new Date(lunW);
+    domW.setDate(lunW.getDate() + 6);
+    var d1W = toStrFlujo(lunW);
+    var d2W = toStrFlujo(domW);
+    // Solo cajas (ventas de locales), NO otros ingresos
+    var ventasW = state.cajas.filter(function(c){return c.fecha>=d1W&&c.fecha<=d2W;}).reduce(function(a,b){return a+parseFloat(b.totalReal||0);},0);
+    if (ventasW > 0) totalesSemanas.push(ventasW);
+  }
+  // Promedio de las semanas completas con datos
+  var ingProyeccionSemanal = totalesSemanas.length > 0
+    ? Math.round(totalesSemanas.reduce(function(a,b){return a+b;},0) / totalesSemanas.length)
+    : 0;
+  var nSemsPromedio = totalesSemanas.length;
+
   for (var dia = 1; dia <= diasMes; dia++) {
     var diaSemana = new Date(year, month-1, dia).getDay(); // 0=Dom, 1=Lun
     if (diaSemana !== 1) continue; // Solo lunes
@@ -3489,53 +3517,13 @@ function renderFlujo() {
     var chqSem = state.cheques.filter(function(c){return c.estado==='pendiente'&&c.tipo==='emitido'&&c.cobro>=d1&&c.cobro<=d2;});
     var gasSem = state.gastos.filter(function(g){return g.fecha>=d1&&g.fecha<=d2&&!g._oblId&&!g._chqId;});
 
-    // Proyección de ingresos — día por día para la semana actual
+    // Proyección de ingresos — promedio de las últimas 4 semanas completas (igual para todas)
     var ingReales = sVentas + sOtrosIng;
     var hoyStr = today();
     var semPasada = d2 < hoyStr;
     var semActual = d1 <= hoyStr && hoyStr <= d2;
-    var ingProyectado = 0;
-    var nSemsRef = 0;
-
-    if (!semPasada) {
-      // Para cada día de la semana, calcular el promedio de ese mismo día de semana
-      // en las últimas 4 ocurrencias históricas
-      var diaActual = new Date(d1);
-      var diaFin = new Date(d2);
-      var ingProyDias = 0;
-      var diasContados = 0;
-
-      while (diaActual <= diaFin) {
-        var dStr = diaActual.getFullYear()+'-'+pad(diaActual.getMonth()+1)+'-'+pad(diaActual.getDate());
-        var diaSem = diaActual.getDay(); // 0=Dom,1=Lun,...,6=Sab
-
-        // Si el día ya pasó (o es hoy), usar el real
-        if (dStr <= hoyStr) {
-          var realDia = state.cajas.filter(function(c){return c.fecha===dStr;}).reduce(function(a,b){return a+parseFloat(b.totalReal||0);},0)
-            + state.ingresos.filter(function(i){return i.fecha===dStr;}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0);
-          ingProyDias += realDia;
-          diasContados++;
-        } else {
-          // Día futuro: buscar el promedio de ese día de semana en las últimas 4 semanas
-          var muestras = [];
-          for (var w = 1; w <= 4; w++) {
-            var dRef = new Date(diaActual);
-            dRef.setDate(dRef.getDate() - 7*w);
-            var dRefStr = dRef.getFullYear()+'-'+pad(dRef.getMonth()+1)+'-'+pad(dRef.getDate());
-            var refVal = state.cajas.filter(function(c){return c.fecha===dRefStr;}).reduce(function(a,b){return a+parseFloat(b.totalReal||0);},0)
-              + state.ingresos.filter(function(i){return i.fecha===dRefStr;}).reduce(function(a,b){return a+parseFloat(b.monto||0);},0);
-            if (refVal > 0) muestras.push(refVal);
-          }
-          if (muestras.length > 0) {
-            ingProyDias += Math.round(muestras.reduce(function(a,b){return a+b;},0) / muestras.length);
-            nSemsRef = Math.max(nSemsRef, muestras.length);
-          }
-          diasContados++;
-        }
-        diaActual.setDate(diaActual.getDate()+1);
-      }
-      ingProyectado = ingProyDias;
-    }
+    var ingProyectado = ingProyeccionSemanal; // mismo valor para todas las semanas
+    var nSemsRef = nSemsPromedio;
 
     semanas.push({label:label, semKey:semKey, d1:d1, d2:d2, semNum:semNum,
       ing:ingReales, gasPag:sGas+sOblPag, oblPend:sOblPend, chqPend:sChqPend,
@@ -3543,9 +3531,9 @@ function renderFlujo() {
       semPasada:semPasada, semActual:semActual, ingProyectado:ingProyectado, nSems:nSemsRef});
   }
 
-  // Total proyectado del mes: suma de ingParaCalculo de cada semana
+  // Total proyectado del mes: todas las semanas usan el mismo promedio proyectado
   const totalIngProyectado = semanas.reduce(function(a,s) {
-    return a + (s.semPasada ? s.ing : (s.ingProyectado > 0 ? s.ingProyectado : s.ing));
+    return a + (s.ingProyectado > 0 ? s.ingProyectado : s.ing);
   }, 0);
   const elProy = document.getElementById('flujo-ing-proyectado');
   if (elProy) {
@@ -3568,25 +3556,23 @@ function renderFlujo() {
       ? s.instSem.filter(function(i){ return (i.oblDesc||'').toLowerCase().includes(flujoQ); })
       : s.instSem;
     const totalGastos = s.gasPag + s.oblPend + s.chqPend;
-    // Para el cálculo: semanas pasadas usan real, semana actual y futuras usan proyectado
-    const ingParaCalculo = (s.semPasada) ? s.ing : (s.ingProyectado > 0 ? s.ingProyectado : s.ing);
+    // Todas las semanas usan el ingreso proyectado (promedio últimas 4 semanas completas)
+    const ingParaCalculo = s.ingProyectado > 0 ? s.ingProyectado : s.ing;
     acum += ingParaCalculo - totalGastos;
     const res2 = ingParaCalculo - totalGastos;
     const semId = 'sem-det-' + s.semKey;
     const pendCount = instSemFilt.filter(i=>i.estado==='pendiente').length;
 
-    // Label ingreso según estado de la semana
+    // Label ingreso — proyectado para todas, con el real como referencia secundaria
     let ingLabel;
-    if (s.semPasada) {
-      ingLabel = '<span style="color:var(--green)">↑ '+fmt(s.ing)+'</span> <span style="font-size:10px;color:var(--text3)">real</span>';
-    } else if (s.semActual) {
-      ingLabel = '<span style="color:var(--green)">↑ '+fmt(s.ing)+'</span> <span style="font-size:10px;color:var(--text3)">real hasta hoy</span>';
-      if (s.ingProyectado > 0) {
-        ingLabel += ' <span style="font-size:10px;color:#5090e0">· proyectado semana: '+fmt(s.ingProyectado)+'</span>';
+    if (s.ingProyectado > 0) {
+      ingLabel = '<span style="color:#5090e0">↑ '+fmt(s.ingProyectado)+'</span> <span style="font-size:10px;color:var(--text3)">proyectado (prom. '+s.nSems+' sem.)</span>';
+      if (s.ing > 0) {
+        ingLabel += ' <span style="font-size:10px;color:var(--green)">· real: '+fmt(s.ing)+'</span>';
       }
     } else {
-      ingLabel = s.ingProyectado > 0
-        ? '<span style="color:#5090e0">↑ '+fmt(s.ingProyectado)+'</span> <span style="font-size:10px;color:var(--text3)">proyectado día a día</span>'
+      ingLabel = s.ing > 0
+        ? '<span style="color:var(--green)">↑ '+fmt(s.ing)+'</span> <span style="font-size:10px;color:var(--text3)">real</span>'
         : '<span style="color:var(--text3)">↑ Sin datos históricos</span>';
     }
 
