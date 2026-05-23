@@ -1813,6 +1813,13 @@
         <label>Dirección</label>
         <input type="text" id="loc-dir" placeholder="Dirección del local">
       </div>
+      <div class="form-group full" style="background:var(--surface2);border-radius:8px;padding:12px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+          <input type="checkbox" id="loc-caja-diaria" checked style="width:auto;margin:0">
+          <span>📦 Este local tiene caja diaria</span>
+        </label>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px">Si está desactivado, el local no aparece en el módulo de Cajas (ej: depósitos, administración)</div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-local')">Cancelar</button>
@@ -3586,8 +3593,9 @@ function renderCajas() {
       <button class="btn btn-primary" onclick="openModal('modal-local');navigate('locales')">+ Agregar mi primer local</button>
     </div>`;
   } else {
+    const localesCaja = state.locales.filter(l=>l.cajaDiaria !== false);
     const totalMes = cajasMes.reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
-    state.locales.forEach(loc => {
+    localesCaja.forEach(loc => {
       const cajasLoc = cajasMes.filter(c=>c.localId===loc.id);
       const totalLoc = cajasLoc.reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
       const diasCargados = cajasLoc.length;
@@ -4660,6 +4668,12 @@ function openModal(id) {
     const rec=document.getElementById('obl-recordatorio'); if(rec) rec.checked=false;
     toggleRecordatorioDias();
   }
+  if (id === 'modal-local') {
+    document.getElementById('loc-id').value='';
+    document.getElementById('loc-modal-title').textContent='Nuevo Local';
+    ['loc-nombre','loc-dir'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=''; });
+    const cd=document.getElementById('loc-caja-diaria'); if(cd) cd.checked=true;
+  }
   document.getElementById(id).style.display='flex';
 }
 
@@ -4782,6 +4796,8 @@ function editarLocal(id) {
   document.getElementById('loc-tipo').value       = l.tipo||'pancheria';
   document.getElementById('loc-color').value      = l.color||'#f0c040';
   document.getElementById('loc-dir').value        = l.dir||'';
+  const cd = document.getElementById('loc-caja-diaria');
+  if (cd) cd.checked = l.cajaDiaria !== false; // default true
   document.getElementById('modal-local').style.display='flex';
 }
 
@@ -4833,7 +4849,10 @@ function fillSelects() {
 
   ['ing-local','gas-local','obl-local','trans-local'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=localOpts; });
   const cajLocal = document.getElementById('caj-local');
-  if (cajLocal) cajLocal.innerHTML = `<option value="">— Seleccioná —</option>` + (state.locales.map(l=>`<option value="${l.id}">${l.tipo==='pancheria'?'🌭':'🍦'} ${l.nombre}</option>`).join(''));
+  if (cajLocal) {
+    const localesConCaja = state.locales.filter(l=>l.cajaDiaria !== false);
+    cajLocal.innerHTML = `<option value="">— Seleccioná —</option>` + (localesConCaja.map(l=>`<option value="${l.id}">${l.tipo==='pancheria'?'🌭':l.tipo==='heladeria'?'🍦':'📦'} ${l.nombre}</option>`).join(''));
+  }
   ['ing-proveedor','chq-proveedor'].forEach(id=>{ const el=document.getElementById(id); if(el)el.innerHTML=provOpts; });
   // Cat selector for cheque (gastos)
   const chqCat = document.getElementById('chq-cat');
@@ -5261,6 +5280,24 @@ function saveCaja() {
     });
   }
 
+  // Auto-generar ingreso en efectivo del depósito de caja
+  // Primero limpiar ingreso anterior de esta caja (si se está editando)
+  state.ingresos = state.ingresos.filter(function(i){ return i._cajaDepositoId !== cajaId; });
+  if (deposito > 0) {
+    const locNombre = (state.locales.find(function(l){return l.id===localId;})||{}).nombre || 'local';
+    state.ingresos.push({
+      id: uid(),
+      fecha: fecha,
+      monto: deposito,
+      pago: 'efectivo',
+      cat: 'Depósito de Caja',
+      subcat: '',
+      localId: localId,
+      desc: 'Depósito en efectivo — '+locNombre,
+      _cajaDepositoId: cajaId,
+    });
+  }
+
   save(); closeModal('modal-caja'); renderCajas(); updateTopbar();
   ['caj-sistema','caj-banco','caj-gastos-ef','caj-parcial','caj-efectivo','caj-deposito','caj-notas'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
@@ -5330,6 +5367,7 @@ function saveLocal() {
     tipo:   document.getElementById('loc-tipo').value,
     color:  document.getElementById('loc-color').value,
     dir:    document.getElementById('loc-dir').value,
+    cajaDiaria: document.getElementById('loc-caja-diaria')?.checked !== false,
   };
   if (!data.nombre) return alert('Ingresá el nombre del local');
   if (editId) {
