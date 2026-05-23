@@ -596,6 +596,8 @@
           <span class="pill active" onclick="filterMovs('ingresos','todos',this)">Todos</span>
           <span class="pill" onclick="filterMovs('ingresos','efectivo',this)">💵 Efectivo</span>
           <span class="pill" onclick="filterMovs('ingresos','banco',this)">🏦 Banco</span>
+          <span class="pill" onclick="filterMovs('ingresos','operativo',this)">✅ Operativos</span>
+          <span class="pill" onclick="filterMovs('ingresos','no_operativo',this)">🔄 No Operativos</span>
         </div>
         <div style="margin-bottom:10px">
           <input type="text" id="search-ingresos" placeholder="🔍 Buscar por descripción, categoría, proveedor..." oninput="renderMovimientos('ingresos')"
@@ -1225,6 +1227,13 @@
     </div>
     <input type="hidden" id="ing-id">
     <div class="form-grid">
+      <div class="form-group">
+        <label>Tipo de Ingreso</label>
+        <select id="ing-tipo">
+          <option value="operativo">✅ Operativo (ventas, servicios)</option>
+          <option value="no_operativo">🔄 No Operativo (dólares, préstamos, etc.)</option>
+        </select>
+      </div>
       <div class="form-group">
         <label>Fecha</label>
         <input type="date" id="ing-fecha">
@@ -2789,7 +2798,10 @@ function filterMovs(tipo, val, el) {
 function renderMovimientos(tipo) {
   const data = tipo === 'ingresos' ? state.ingresos : state.gastos;
   const fil = currentFilter[tipo];
-  let filtered = fil === 'todos' ? data : data.filter(m=>m.pago===fil);
+  let filtered;
+  if (fil === 'todos') filtered = data;
+  else if (fil === 'operativo' || fil === 'no_operativo') filtered = data.filter(m=>(m.tipo||'operativo')===fil);
+  else filtered = data.filter(m=>m.pago===fil);
   // Buscador
   const q = (document.getElementById('search-'+tipo)?.value||'').toLowerCase().trim();
   if (q) {
@@ -2809,11 +2821,15 @@ function renderMovimientos(tipo) {
     return;
   }
   tbody.innerHTML = sorted.map(m=>{
-    // Resaltar término buscado en descripción y proveedor
     const hl = (txt) => q && txt ? txt.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<mark style="background:#f0c04033;color:var(--accent);border-radius:2px">$1</mark>') : (txt||'-');
+    const tipoBadge = tipo==='ingresos'
+      ? (m.tipo==='no_operativo'
+          ? '<span style="font-size:10px;background:rgba(144,144,168,0.15);color:var(--text3);border-radius:4px;padding:1px 5px;margin-left:4px">🔄 No Op.</span>'
+          : '')
+      : '';
     return `<tr>
     <td>${fmtDate(m.fecha)}</td>
-    <td>${hl(m.desc)}</td>
+    <td>${hl(m.desc)}${tipoBadge}</td>
     <td class="hide-mobile"><span class="badge badge-gray">${m.cat||'-'}</span></td>
     <td class="hide-mobile" style="color:var(--text3);font-size:12px">${m.subcat||'-'}</td>
     <td>${tagPago(m.pago)}</td>
@@ -4733,6 +4749,12 @@ function editarMov(tipo, id) {
     const provEl = document.getElementById(prefix+'-proveedor');
     if (provEl) provEl.value = m.provId||'';
   }
+  if (tipo==='ingresos') {
+    const tipoEl = document.getElementById('ing-tipo');
+    if (tipoEl) tipoEl.value = m.tipo || 'operativo';
+    const cliEl = document.getElementById('ing-cliente');
+    if (cliEl) cliEl.value = m.clienteId||'';
+  }
   const catSel = document.getElementById(prefix+'-cat');
   if(catSel && m.cat){ catSel.value=m.cat; fillSubcat(prefix); }
   setTimeout(function(){
@@ -5001,6 +5023,7 @@ function autocompletarDesdeProveedor() {
 function saveIngreso() {
   const editId = document.getElementById('ing-id').value;
   const data = {
+    tipo:  document.getElementById('ing-tipo')?.value || 'operativo',
     fecha: document.getElementById('ing-fecha').value,
     monto: document.getElementById('ing-monto').value,
     pago:  document.getElementById('ing-pago').value,
