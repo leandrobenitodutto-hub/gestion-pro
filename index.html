@@ -5265,15 +5265,15 @@ function cajRenderDepositos() {
   const lista = document.getElementById('caj-depositos-lista');
   if (!lista) return;
   if (_cajDepositos.length === 0) { lista.innerHTML = ''; return; }
-  const provOpts = '<option value="">— Proveedor (opcional) —</option>' +
-    [...state.proveedores].sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');})
-      .map(function(p){return '<option value="'+p.id+'">'+p.nombre+'</option>';}).join('');
+  const cliOpts = '<option value="">— Cliente (opcional) —</option>' +
+    [...state.clientes].sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');})
+      .map(function(c){return '<option value="'+c.id+'">'+c.nombre+'</option>';}).join('');
   lista.innerHTML = _cajDepositos.map(function(d){
     return '<div style="display:grid;grid-template-columns:1fr 100px 36px;gap:6px;margin-bottom:8px;align-items:start" id="caj-dep-row-'+d.id+'">'+
       '<div style="display:grid;gap:4px">'+
         '<select style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px" '+
-          'onchange="cajDepChange(\''+d.id+'\',\'provId\',this.value)">'+provOpts+'</select>'+
-        '<input type="text" placeholder="Descripción (ej: depósito banco)" value="'+escHtml(d.desc||'')+'" '+
+          'onchange="cajDepChange(\''+d.id+'\',\'cliId\',this.value)">'+cliOpts+'</select>'+
+        '<input type="text" placeholder="Descripción (ej: venta fuera del local)" value="'+escHtml(d.desc||'')+'" '+
           'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;width:100%;box-sizing:border-box" '+
           'oninput="cajSetDescDeposito(\''+d.id+'\',this.value)">'+
       '</div>'+
@@ -5390,7 +5390,7 @@ function saveCaja() {
     if (_cajDepositos.length > 0) {
       _cajDepositos.forEach(function(d) {
         if (!d.monto || d.monto <= 0) return;
-        const prov = state.proveedores.find(function(p){return p.id===d.provId;});
+        const cli = state.clientes.find(function(c){return c.id===d.cliId;});
         state.ingresos.push({
           id: uid(),
           fecha: fecha,
@@ -5398,9 +5398,9 @@ function saveCaja() {
           pago: 'efectivo',
           cat: 'Depósito de Caja',
           subcat: '',
-          provId: d.provId || null,
+          cliId: d.cliId || null,
           localId: localId,
-          desc: d.desc || (prov ? prov.nombre : 'Depósito en efectivo — '+locNombre),
+          desc: d.desc || (cli ? cli.nombre : 'Depósito en efectivo — '+locNombre),
           _cajaDepositoId: cajaId,
         });
       });
