@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reporte Mensual — GestiónPro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f0f11; color: #e8e8f0; padding: 24px; min-height: 100vh; }
+  h1 { color: #f0c040; font-size: 22px; margin-bottom: 4px; }
+  .sub { color: #9090a8; font-size: 13px; margin-bottom: 24px; }
+  .card { background: #18181c; border: 1px solid #2e2e38; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 14px; color: #9090a8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  label { font-size: 13px; color: #9090a8; margin-right: 6px; }
+  select, input[type=month] { background: #222; color: #eee; border: 1px solid #444; border-radius: 8px; padding: 7px 12px; font-size: 14px; }
+  .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: opacity 0.2s; }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: #f0c040; color: #1a1500; }
+  .btn-pdf { background: #e05858; color: #fff; }
+  .btn-excel { background: #217346; color: #fff; }
+  .btn-secondary { background: #2e2e38; color: #e8e8f0; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat { background: #222; border-radius: 8px; padding: 12px; }
+  .stat .lbl { font-size: 11px; color: #9090a8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .stat .val { font-size: 20px; font-weight: 700; font-family: monospace; }
+  .green { color: #40c080; } .red { color: #e05858; } .blue { color: #5090e0; } .yellow { color: #f0c040; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 10px; background: #222; color: #9090a8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #2e2e38; }
+  tr:last-child td { border-bottom: none; }
+  .mono { font-family: monospace; }
+  .section-title { font-size: 15px; font-weight: 700; color: #f0c040; margin-bottom: 10px; border-bottom: 1px solid #2e2e38; padding-bottom: 8px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; background: #2e2e38; color: #9090a8; }
+  .loading { text-align: center; padding: 40px; color: #9090a8; }
+  .preview { display: none; }
+  .bar-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .bar-label { font-size: 12px; color: #e8e8f0; width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-bg { flex: 1; background: #2e2e38; border-radius: 4px; height: 16px; }
+  .bar-fill { height: 16px; border-radius: 4px; background: #e05858; transition: width 0.3s; }
+  .bar-val { font-size: 12px; font-family: monospace; color: #e05858; width: 110px; text-align: right; }
+  .bar-fill.ing { background: #40c080; }
+  .bar-val.ing { color: #40c080; }
+  #status { padding: 10px 16px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; display: none; }
+  .status-ok { background: rgba(64,192,128,0.15); color: #40c080; }
+  .status-err { background: rgba(224,88,88,0.15); color: #e05858; }
+</style>
+</head>
+<body>
+<h1>📊 Reporte Mensual — GestiónPro</h1>
+<p class="sub">Generá el reporte de cierre de mes en PDF y Excel</p>
+
+<div class="card">
+  <div class="row">
+    <label>Mes:</label>
+    <input type="month" id="mes-sel" value="">
+    <button class="btn btn-primary" onclick="cargarDatos()">📥 Cargar datos</button>
+  </div>
+  <div id="status"></div>
+</div>
+
+<div class="preview" id="preview">
+  <!-- Resumen ejecutivo -->
+  <div class="card">
+    <div class="section-title">📋 Resumen Ejecutivo — <span id="rpt-mes-label"></span></div>
+    <div class="stat-grid" id="rpt-stats"></div>
+  </div>
+
+  <!-- Ingresos -->
+  <div class="card">
+    <div class="section-title">↑ Ingresos del Mes</div>
+    <h2>Cajas por Local</h2>
+    <div id="rpt-cajas-bars" style="margin-bottom:16px"></div>
+    <table id="rpt-cajas-table">
+      <thead><tr><th>Local</th><th>Días</th><th>Promedio/día</th><th class="mono">Total</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div style="margin-top:16px">
+      <h2>Otros Ingresos Operativos</h2>
+      <table id="rpt-otros-ing-table" style="margin-top:8px">
+        <thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Forma de pago</th><th class="mono">Monto</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div style="margin-top:16px">
+      <h2>Ingresos No Operativos</h2>
+      <table id="rpt-no-op-table" style="margin-top:8px">
+        <thead><tr><th>Fecha</th><th>Descripción</th><th>Forma de pago</th><th class="mono">Monto</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Gastos -->
+  <div class="card">
+    <div class="section-title">↓ Gastos del Mes</div>
+    <h2>Por Categoría</h2>
+    <div id="rpt-gastos-bars" style="margin-bottom:16px;margin-top:8px"></div>
+    <table id="rpt-gastos-cat-table" style="margin-bottom:16px">
+      <thead><tr><th>Categoría</th><th>Subcategoría</th><th>Mov.</th><th class="mono">Total</th><th>%</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <h2>Detalle de Gastos</h2>
+    <table id="rpt-gastos-table" style="margin-top:8px">
+      <thead><tr><th>Fecha</th><th>Descripción/Proveedor</th><th>Categoría</th><th>Local</th><th>Forma pago</th><th class="mono">Monto</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Obligaciones -->
+  <div class="card">
+    <div class="section-title">📅 Obligaciones del Mes</div>
+    <table id="rpt-obl-table">
+      <thead><tr><th>Obligación</th><th>Vencimiento</th><th>Estado</th><th>Pagado el</th><th class="mono">Monto</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Cheques -->
+  <div class="card">
+    <div class="section-title">📄 Cheques del Mes</div>
+    <table id="rpt-chq-table">
+      <thead><tr><th>Tipo</th><th>Proveedor/Titular</th><th>N°</th><th>Banco</th><th>F.Cobro</th><th>Estado</th><th class="mono">Monto</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Botones exportar -->
+  <div class="card">
+    <div class="row">
+      <button class="btn btn-pdf" onclick="exportarPDF()">📄 Descargar PDF</button>
+      <button class="btn btn-excel" onclick="exportarExcel()">📊 Descargar Excel</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey:"AIzaSyBekd8KL6oSmD2rrVza6bEmgXl3GiVgD8w",
+  authDomain:"gestion-pro-a3b9f.firebaseapp.com",
+  projectId:"gestion-pro-a3b9f",
+  storageBucket:"gestion-pro-a3b9f.firebasestorage.app",
+  messagingSenderId:"93911990510",
+  appId:"1:93911990510:web:189bc343477f9d47fa73ff"
+});
+const db = getFirestore(app);
+
+// Set default month
+const now = new Date();
+document.getElementById('mes-sel').value = now.getFullYear()+'-'+(now.getMonth()+1+'').padStart(2,'0');
+
+let S = {}; // state
+let MES = '';
+
+const fmt = n => '$'+Math.round(n).toLocaleString('es-AR');
+const fmtDate = s => s ? s.split('-').reverse().join('/') : '-';
+const getLocal = id => (S.locales||[]).find(l=>l.id===id)||{nombre:'-'};
+const getProv = id => (S.proveedores||[]).find(p=>p.id===id)||{nombre:'-'};
+
+function setStatus(msg, ok=true) {
+  const el = document.getElementById('status');
+  el.textContent = msg; el.style.display='block';
+  el.className = ok ? 'status-ok' : 'status-err';
+}
+
+window.cargarDatos = async function() {
+  MES = document.getElementById('mes-sel').value;
+  if (!MES) return setStatus('Elegí un mes', false);
+  setStatus('Cargando datos de Firebase...');
+  try {
+    const snap = await getDoc(doc(db,'gestion-pro','data'));
+    S = snap.data();
+    setStatus('✓ Datos cargados correctamente');
+    renderPreview();
+    document.getElementById('preview').style.display='block';
+  } catch(e) {
+    setStatus('Error al cargar: '+e.message, false);
+  }
+};
+
+function renderPreview() {
+  const [y,m] = MES.split('-').map(Number);
+  const label = new Date(y,m-1,1).toLocaleString('es-AR',{month:'long',year:'numeric'});
+  document.getElementById('rpt-mes-label').textContent = label.charAt(0).toUpperCase()+label.slice(1);
+
+  // ── Datos del mes ──
+  const cajasMes = (S.cajas||[]).filter(c=>c.fecha&&c.fecha.startsWith(MES));
+  const ingMes   = (S.ingresos||[]).filter(i=>i.fecha&&i.fecha.startsWith(MES));
+  const gasMes   = (S.gastos||[]).filter(g=>g.fecha&&g.fecha.startsWith(MES)&&!g._oblId&&!g._chqId);
+  const oblMes   = (S.oblInstancias||[]).filter(i=>i.periodo===MES||
+    (i.fechaVto&&i.fechaVto.startsWith(MES)));
+  const chqMes   = (S.cheques||[]).filter(c=>c.cobro&&c.cobro.startsWith(MES));
+
+  const ingOpMes = ingMes.filter(i=>(i.tipo||'operativo')==='operativo'&&!i._cajaDepositoId);
+  const ingNoOp  = ingMes.filter(i=>i.tipo==='no_operativo');
+  const totalCajas = cajasMes.reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
+  const totalIngOp = ingOpMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalIngNoOp = ingNoOp.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalIngReal = totalCajas + totalIngOp;
+  const totalGas = gasMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const oblPagadas = oblMes.filter(o=>o.estado==='pagado');
+  const oblPend = oblMes.filter(o=>o.estado==='pendiente');
+  const totalOblPag = oblPagadas.reduce((a,b)=>a+parseFloat(b.montoPagado||b.monto||0),0);
+  const totalOblPend = oblPend.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalEgresos = totalGas + totalOblPag;
+  const resultado = totalIngReal - totalEgresos;
+
+  // Stats
+  document.getElementById('rpt-stats').innerHTML = [
+    {l:'Ingresos por Cajas', v:fmt(totalCajas), c:'green'},
+    {l:'Otros Ingresos', v:fmt(totalIngOp), c:'green'},
+    {l:'Total Ingresos Operativos', v:fmt(totalIngReal), c:'green'},
+    {l:'Total Gastos', v:fmt(totalGas), c:'red'},
+    {l:'Obligaciones Pagadas', v:fmt(totalOblPag), c:'red'},
+    {l:'Total Egresos', v:fmt(totalEgresos), c:'red'},
+    {l:'Resultado Neto', v:fmt(resultado), c:resultado>=0?'green':'red'},
+    {l:'Obligaciones Pendientes', v:fmt(totalOblPend), c:'yellow'},
+  ].map(s=>`<div class="stat"><div class="lbl">${s.l}</div><div class="val ${s.c}">${s.v}</div></div>`).join('');
+
+  // Cajas por local
+  const localesConCaja = [...new Set(cajasMes.map(c=>c.localId))];
+  const cajasRows = localesConCaja.map(lid=>{
+    const locs = cajasMes.filter(c=>c.localId===lid);
+    const total = locs.reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
+    return {local:getLocal(lid).nombre, dias:locs.length, total, prom:total/locs.length};
+  }).sort((a,b)=>b.total-a.total);
+  const maxCaja = Math.max(...cajasRows.map(r=>r.total),1);
+
+  document.getElementById('rpt-cajas-bars').innerHTML = cajasRows.map(r=>`
+    <div class="bar-wrap">
+      <div class="bar-label">${r.local}</div>
+      <div class="bar-bg"><div class="bar-fill ing" style="width:${r.total/maxCaja*100}%"></div></div>
+      <div class="bar-val ing">${fmt(r.total)}</div>
+    </div>`).join('');
+  document.getElementById('rpt-cajas-table').querySelector('tbody').innerHTML =
+    cajasRows.map(r=>`<tr><td>${r.local}</td><td>${r.dias}</td><td class="mono">${fmt(r.prom)}</td><td class="mono green">${fmt(r.total)}</td></tr>`).join('')+
+    `<tr style="font-weight:700;background:#222"><td>TOTAL</td><td>${cajasMes.length}</td><td class="mono">-</td><td class="mono green">${fmt(totalCajas)}</td></tr>`;
+
+  // Otros ingresos operativos
+  document.getElementById('rpt-otros-ing-table').querySelector('tbody').innerHTML =
+    ingOpMes.length ? ingOpMes.sort((a,b)=>a.fecha>b.fecha?1:-1).map(i=>`
+      <tr><td>${fmtDate(i.fecha)}</td><td>${i.desc||'-'}</td>
+      <td><span class="badge">${i.cat||'-'}</span></td>
+      <td>${i.pago||'-'}</td><td class="mono green">${fmt(i.monto)}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="color:#9090a8;text-align:center">Sin otros ingresos operativos</td></tr>';
+
+  // No operativos
+  document.getElementById('rpt-no-op-table').querySelector('tbody').innerHTML =
+    ingNoOp.length ? ingNoOp.sort((a,b)=>a.fecha>b.fecha?1:-1).map(i=>`
+      <tr><td>${fmtDate(i.fecha)}</td><td>${i.desc||'-'}</td>
+      <td>${i.pago||'-'}</td><td class="mono" style="color:#9090a8">${fmt(i.monto)}</td></tr>`).join('')
+    : '<tr><td colspan="4" style="color:#9090a8;text-align:center">Sin ingresos no operativos</td></tr>';
+
+  // Gastos por categoría
+  const gasCats = {};
+  gasMes.forEach(g=>{
+    const key = (g.cat||'Sin categoría')+'|||'+(g.subcat||'');
+    if (!gasCats[key]) gasCats[key]={cat:g.cat||'Sin categoría',sub:g.subcat||'',total:0,n:0};
+    gasCats[key].total+=parseFloat(g.monto||0);
+    gasCats[key].n++;
+  });
+  const catRows = Object.values(gasCats).sort((a,b)=>b.total-a.total);
+  const maxGas = Math.max(...catRows.map(r=>r.total),1);
+
+  document.getElementById('rpt-gastos-bars').innerHTML = catRows.slice(0,10).map(r=>`
+    <div class="bar-wrap">
+      <div class="bar-label">${r.cat}${r.sub?' › '+r.sub:''}</div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${r.total/maxGas*100}%"></div></div>
+      <div class="bar-val">${fmt(r.total)}</div>
+    </div>`).join('');
+
+  document.getElementById('rpt-gastos-cat-table').querySelector('tbody').innerHTML =
+    catRows.map(r=>`<tr>
+      <td><strong>${r.cat}</strong></td><td style="color:#9090a8">${r.sub||'-'}</td>
+      <td>${r.n}</td><td class="mono red">${fmt(r.total)}</td>
+      <td style="color:#9090a8">${(r.total/totalGas*100).toFixed(1)}%</td></tr>`).join('')+
+    `<tr style="font-weight:700;background:#222"><td colspan="3">TOTAL</td><td class="mono red">${fmt(totalGas)}</td><td>100%</td></tr>`;
+
+  // Detalle gastos
+  document.getElementById('rpt-gastos-table').querySelector('tbody').innerHTML =
+    [...gasMes].sort((a,b)=>a.fecha>b.fecha?1:-1).map(g=>`<tr>
+      <td>${fmtDate(g.fecha)}</td>
+      <td>${g.desc||getProv(g.provId).nombre||'-'}</td>
+      <td><span class="badge">${g.cat||'-'}</span></td>
+      <td style="font-size:12px;color:#9090a8">${getLocal(g.localId).nombre||'-'}</td>
+      <td style="font-size:12px">${g.pago||'-'}</td>
+      <td class="mono red">${fmt(g.monto)}</td></tr>`).join('');
+
+  // Obligaciones
+  document.getElementById('rpt-obl-table').querySelector('tbody').innerHTML =
+    oblMes.length ? [...oblMes].sort((a,b)=>(a.fechaVto||'')>(b.fechaVto||'')?1:-1).map(o=>`<tr>
+      <td><strong>${o.oblDesc||'-'}</strong></td>
+      <td>${fmtDate(o.fechaVto)}</td>
+      <td><span class="badge" style="color:${o.estado==='pagado'?'#40c080':o.estado==='pendiente'?'#e05858':'#9090a8'}">${o.estado}</span></td>
+      <td>${fmtDate(o.fechaPago)}</td>
+      <td class="mono" style="color:${o.estado==='pagado'?'#40c080':'#e05858'}">${fmt(o.montoPagado||o.monto)}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="color:#9090a8;text-align:center">Sin obligaciones en este mes</td></tr>';
+
+  // Cheques
+  document.getElementById('rpt-chq-table').querySelector('tbody').innerHTML =
+    chqMes.length ? [...chqMes].sort((a,b)=>a.cobro>b.cobro?1:-1).map(c=>`<tr>
+      <td><span class="badge">${c.tipo}</span></td>
+      <td>${getProv(c.provId).nombre||c.titular||'-'}</td>
+      <td>${c.numero||'-'}</td><td>${c.banco||'-'}</td>
+      <td>${fmtDate(c.cobro)}</td>
+      <td><span class="badge" style="color:${c.estado==='cobrado'?'#40c080':'#e05858'}">${c.estado}</span></td>
+      <td class="mono">${fmt(c.monto)}</td></tr>`).join('')
+    : '<tr><td colspan="7" style="color:#9090a8;text-align:center">Sin cheques en este mes</td></tr>';
+
+  // Guardar datos para exportar
+  window._rptData = {MES,label,cajasRows,ingOpMes,ingNoOp,gasMes,catRows,oblMes,chqMes,
+    totalCajas,totalIngOp,totalIngNoOp,totalIngReal,totalGas,totalOblPag,totalOblPend,totalEgresos,resultado};
+}
+
+window.exportarPDF = function() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const d = window._rptData;
+  const pageW = doc.internal.pageSize.getWidth();
+
+  // Header
+  doc.setFillColor(15,15,17);
+  doc.rect(0,0,pageW,30,'F');
+  doc.setTextColor(240,192,64);
+  doc.setFontSize(18); doc.setFont('helvetica','bold');
+  doc.text('GestiónPro — Reporte Mensual', 14, 14);
+  doc.setFontSize(11); doc.setFont('helvetica','normal');
+  doc.setTextColor(144,144,168);
+  doc.text(d.label.charAt(0).toUpperCase()+d.label.slice(1), 14, 22);
+  doc.setTextColor(100,100,120);
+  doc.text('Generado: '+new Date().toLocaleDateString('es-AR'), pageW-14, 22, {align:'right'});
+
+  let y = 38;
+  const col = '#1a1a20'; const hcol = '#f0c040';
+
+  // ── Resumen ejecutivo ──
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(240,192,64);
+  doc.text('RESUMEN EJECUTIVO', 14, y); y+=8;
+
+  const stats2 = [
+    ['Ingresos por Cajas', fmt(d.totalCajas), [64,192,128]],
+    ['Otros Ingresos Operativos', fmt(d.totalIngOp), [64,192,128]],
+    ['Total Ingresos Operativos', fmt(d.totalIngReal), [64,192,128]],
+    ['Total Gastos', fmt(d.totalGas), [224,88,88]],
+    ['Obligaciones Pagadas', fmt(d.totalOblPag), [224,88,88]],
+    ['Total Egresos', fmt(d.totalEgresos), [224,88,88]],
+    ['Resultado Neto', fmt(d.resultado), d.resultado>=0?[64,192,128]:[224,88,88]],
+    ['Obligaciones Pendientes', fmt(d.totalOblPend), [240,192,64]],
+  ];
+  const colW = (pageW-28)/2;
+  stats2.forEach((s,i)=>{
+    const cx = 14 + (i%2)*colW;
+    const cy = y + Math.floor(i/2)*14;
+    doc.setFillColor(30,30,36); doc.roundedRect(cx,cy,colW-4,12,2,2,'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(144,144,168);
+    doc.text(s[0], cx+4, cy+5);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...s[2]);
+    doc.text(s[1], cx+colW-8, cy+9, {align:'right'});
+  });
+  y += Math.ceil(stats2.length/2)*14 + 10;
+
+  // ── Cajas por local ──
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(240,192,64);
+  doc.text('VENTAS POR LOCAL', 14, y); y+=6;
+  doc.autoTable({
+    startY: y, margin:{left:14,right:14},
+    head:[['Local','Días','Promedio/día','Total']],
+    body: d.cajasRows.map(r=>[r.local, r.dias, fmt(r.prom), fmt(r.total)])
+      .concat([['TOTAL', d.cajasRows.reduce((a,r)=>a+r.dias,0), '-', fmt(d.totalCajas)]]),
+    headStyles:{fillColor:[30,30,40],textColor:[144,144,168],fontSize:9},
+    bodyStyles:{fillColor:[24,24,28],textColor:[232,232,240],fontSize:10},
+    alternateRowStyles:{fillColor:[28,28,34]},
+    columnStyles:{3:{textColor:[64,192,128],fontStyle:'bold'}},
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // ── Gastos por categoría ──
+  if (y > 220) { doc.addPage(); y = 20; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(240,192,64);
+  doc.text('GASTOS POR CATEGORÍA', 14, y); y+=6;
+  doc.autoTable({
+    startY: y, margin:{left:14,right:14},
+    head:[['Categoría','Subcategoría','Movimientos','Total','%']],
+    body: d.catRows.map(r=>[r.cat, r.sub||'-', r.n, fmt(r.total), (r.total/d.totalGas*100).toFixed(1)+'%'])
+      .concat([['TOTAL','',d.gasMes.length,fmt(d.totalGas),'100%']]),
+    headStyles:{fillColor:[30,30,40],textColor:[144,144,168],fontSize:9},
+    bodyStyles:{fillColor:[24,24,28],textColor:[232,232,240],fontSize:10},
+    alternateRowStyles:{fillColor:[28,28,34]},
+    columnStyles:{3:{textColor:[224,88,88],fontStyle:'bold'}},
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // ── Detalle gastos ──
+  if (y > 180) { doc.addPage(); y = 20; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(240,192,64);
+  doc.text('DETALLE DE GASTOS', 14, y); y+=6;
+  doc.autoTable({
+    startY: y, margin:{left:14,right:14},
+    head:[['Fecha','Descripción','Categoría','Local','Forma pago','Monto']],
+    body: [...d.gasMes].sort((a,b)=>a.fecha>b.fecha?1:-1).map(g=>[
+      fmtDate(g.fecha), g.desc||getProv(g.provId).nombre||'-',
+      g.cat||'-', getLocal(g.localId).nombre||'-', g.pago||'-', fmt(g.monto)
+    ]),
+    headStyles:{fillColor:[30,30,40],textColor:[144,144,168],fontSize:9},
+    bodyStyles:{fillColor:[24,24,28],textColor:[232,232,240],fontSize:9},
+    alternateRowStyles:{fillColor:[28,28,34]},
+    columnStyles:{5:{textColor:[224,88,88],fontStyle:'bold'}},
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // ── Obligaciones ──
+  if (y > 200) { doc.addPage(); y = 20; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(240,192,64);
+  doc.text('OBLIGACIONES DEL MES', 14, y); y+=6;
+  doc.autoTable({
+    startY: y, margin:{left:14,right:14},
+    head:[['Obligación','Vencimiento','Estado','Pagado el','Monto']],
+    body: [...d.oblMes].sort((a,b)=>(a.fechaVto||'')>(b.fechaVto||'')?1:-1).map(o=>[
+      o.oblDesc||'-', fmtDate(o.fechaVto), o.estado, fmtDate(o.fechaPago), fmt(o.montoPagado||o.monto)
+    ]),
+    headStyles:{fillColor:[30,30,40],textColor:[144,144,168],fontSize:9},
+    bodyStyles:{fillColor:[24,24,28],textColor:[232,232,240],fontSize:9},
+    alternateRowStyles:{fillColor:[28,28,34]},
+  });
+
+  // Footer
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i=1; i<=pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,120);
+    doc.text('GestiónPro — '+d.label+' | Pág. '+i+' de '+pageCount, pageW/2, 290, {align:'center'});
+  }
+
+  doc.save('Reporte-GestionPro-'+MES+'.pdf');
+};
+
+window.exportarExcel = function() {
+  const d = window._rptData;
+  const wb = XLSX.utils.book_new();
+
+  const style_title = {font:{bold:true,sz:14,color:{rgb:'F0C040'}},fill:{fgColor:{rgb:'0F0F11'}}};
+  const style_header = {font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1E1E28'}},alignment:{horizontal:'center'}};
+  const style_green = {font:{bold:true,color:{rgb:'40C080'}}};
+  const style_red = {font:{bold:true,color:{rgb:'E05858'}}};
+  const style_num = n => ({v:n, t:'n', z:'$#,##0'});
+
+  // ── Hoja 1: Resumen ──
+  const resumen = [
+    ['GestiónPro — Reporte Mensual', d.label.charAt(0).toUpperCase()+d.label.slice(1)],
+    [],
+    ['RESUMEN EJECUTIVO',''],
+    ['Ingresos por Cajas', d.totalCajas],
+    ['Otros Ingresos Operativos', d.totalIngOp],
+    ['Total Ingresos Operativos', d.totalIngReal],
+    ['Total Gastos', d.totalGas],
+    ['Obligaciones Pagadas', d.totalOblPag],
+    ['Total Egresos', d.totalEgresos],
+    ['Resultado Neto', d.resultado],
+    ['Obligaciones Pendientes', d.totalOblPend],
+  ];
+  const wsRes = XLSX.utils.aoa_to_sheet(resumen);
+  wsRes['!cols'] = [{wch:30},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen');
+
+  // ── Hoja 2: Cajas por local ──
+  const cajasData = [
+    ['Local','Días cargados','Promedio/día','Total'],
+    ...d.cajasRows.map(r=>[r.local, r.dias, r.prom, r.total]),
+    ['TOTAL', d.cajasRows.reduce((a,r)=>a+r.dias,0), '', d.totalCajas],
+  ];
+  const wsCajas = XLSX.utils.aoa_to_sheet(cajasData);
+  wsCajas['!cols'] = [{wch:20},{wch:14},{wch:16},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, wsCajas, 'Cajas por Local');
+
+  // ── Hoja 3: Gastos por categoría ──
+  const catData = [
+    ['Categoría','Subcategoría','Movimientos','Total','% del total'],
+    ...d.catRows.map(r=>[r.cat, r.sub||'-', r.n, r.total, (r.total/d.totalGas*100).toFixed(2)+'%']),
+    ['TOTAL','',d.gasMes.length, d.totalGas,'100%'],
+  ];
+  const wsCat = XLSX.utils.aoa_to_sheet(catData);
+  wsCat['!cols'] = [{wch:22},{wch:20},{wch:14},{wch:16},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsCat, 'Gastos por Categoría');
+
+  // ── Hoja 4: Detalle Gastos ──
+  const gasData = [
+    ['Fecha','Descripción','Proveedor','Categoría','Subcategoría','Local','Forma pago','Monto'],
+    ...[...d.gasMes].sort((a,b)=>a.fecha>b.fecha?1:-1).map(g=>[
+      g.fecha, g.desc||'-', getProv(g.provId).nombre||'-',
+      g.cat||'-', g.subcat||'-', getLocal(g.localId).nombre||'-', g.pago||'-', parseFloat(g.monto||0)
+    ]),
+  ];
+  const wsGas = XLSX.utils.aoa_to_sheet(gasData);
+  wsGas['!cols'] = [{wch:12},{wch:24},{wch:20},{wch:18},{wch:18},{wch:16},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, wsGas, 'Detalle Gastos');
+
+  // ── Hoja 5: Ingresos ──
+  const ingData = [
+    ['Fecha','Descripción','Categoría','Tipo','Forma pago','Monto'],
+    ...d.ingOpMes.sort((a,b)=>a.fecha>b.fecha?1:-1).map(i=>[
+      i.fecha, i.desc||'-', i.cat||'-', 'Operativo', i.pago||'-', parseFloat(i.monto||0)
+    ]),
+    ...d.ingNoOp.map(i=>[
+      i.fecha, i.desc||'-', i.cat||'-', 'No Operativo', i.pago||'-', parseFloat(i.monto||0)
+    ]),
+  ];
+  const wsIng = XLSX.utils.aoa_to_sheet(ingData);
+  wsIng['!cols'] = [{wch:12},{wch:28},{wch:18},{wch:14},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, wsIng, 'Ingresos');
+
+  // ── Hoja 6: Obligaciones ──
+  const oblData = [
+    ['Obligación','Período','Vencimiento','Estado','Fecha Pago','Monto Estimado','Monto Pagado'],
+    ...d.oblMes.sort((a,b)=>(a.fechaVto||'')>(b.fechaVto||'')?1:-1).map(o=>[
+      o.oblDesc||'-', o.periodo||'-', o.fechaVto||'-', o.estado,
+      o.fechaPago||'-', parseFloat(o.monto||0), parseFloat(o.montoPagado||o.monto||0)
+    ]),
+  ];
+  const wsObl = XLSX.utils.aoa_to_sheet(oblData);
+  wsObl['!cols'] = [{wch:24},{wch:10},{wch:12},{wch:10},{wch:12},{wch:16},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, wsObl, 'Obligaciones');
+
+  // ── Hoja 7: Cheques ──
+  const chqData = [
+    ['Tipo','Proveedor/Titular','N°','Banco','F.Cobro','Estado','Monto'],
+    ...d.chqMes.sort((a,b)=>a.cobro>b.cobro?1:-1).map(c=>[
+      c.tipo, getProv(c.provId).nombre||c.titular||'-', c.numero||'-',
+      c.banco||'-', c.cobro||'-', c.estado, parseFloat(c.monto||0)
+    ]),
+  ];
+  const wsChq = XLSX.utils.aoa_to_sheet(chqData);
+  wsChq['!cols'] = [{wch:10},{wch:22},{wch:10},{wch:14},{wch:12},{wch:10},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, wsChq, 'Cheques');
+
+  XLSX.writeFile(wb, 'Reporte-GestionPro-'+MES+'.xlsx');
+};
+</script>
+</body>
+</html>
