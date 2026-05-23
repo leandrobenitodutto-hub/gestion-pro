@@ -341,6 +341,9 @@
   .tag-banco { background: rgba(80,144,224,0.12); color: var(--blue); border: 1px solid rgba(80,144,224,0.25); padding: 2px 9px; border-radius: 12px; font-size: 11px; }
   .tag-cheque { background: rgba(240,192,64,0.12); color: var(--accent); border: 1px solid rgba(240,192,64,0.25); padding: 2px 9px; border-radius: 12px; font-size: 11px; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -426,6 +429,10 @@
       <div class="nav-item" onclick="navigate('analisis');closeMobileMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         <span class="nav-text">Análisis</span>
+      </div>
+      <div class="nav-item" onclick="navigate('reporte');closeMobileMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span class="nav-text">Reporte</span>
       </div>
     </div>
   </div>
@@ -609,7 +616,7 @@
               <thead>
                 <tr>
                   <th>Fecha</th><th>Descripción</th><th class="hide-mobile">Categoría</th><th class="hide-mobile">Subcategoría</th>
-                  <th>F. Pago</th><th class="hide-mobile">Local</th><th class="hide-mobile">Proveedor</th><th class="mono">Monto</th><th></th>
+                  <th>F. Pago</th><th class="hide-mobile">Local</th><th class="hide-mobile">Cliente</th><th class="mono">Monto</th><th></th>
                 </tr>
               </thead>
               <tbody id="tabla-ingresos"><tr><td colspan="9"><div class="empty"><div class="empty-icon">↑</div><p>Sin ingresos registrados</p></div></td></tr></tbody>
@@ -1174,6 +1181,103 @@
               </thead>
               <tbody id="tabla-analisis"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================== REPORTE =================== -->
+      <div class="page" id="page-reporte">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Reporte Mensual</div>
+            <div class="section-sub">Resumen detallado de ingresos, gastos, obligaciones y cheques</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="month" id="rpt-mes-sel" style="width:auto">
+            <button class="btn btn-secondary" onclick="cargarReporte()">📥 Generar</button>
+          </div>
+        </div>
+
+        <div id="rpt-status" style="display:none;padding:10px 16px;border-radius:8px;margin-bottom:12px;font-size:13px"></div>
+
+        <div id="rpt-preview" style="display:none">
+          <!-- Stats -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:12px">📋 Resumen Ejecutivo — <span id="rpt-mes-label"></span></div>
+            <div class="grid-4" id="rpt-stats" style="gap:10px"></div>
+          </div>
+
+          <!-- Cajas -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:12px">↑ Ventas por Local</div>
+            <div id="rpt-cajas-bars" style="margin-bottom:14px"></div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Local</th><th>Días</th><th class="hide-mobile">Promedio/día</th><th class="mono">Total</th></tr></thead>
+              <tbody id="rpt-cajas-tbody"></tbody>
+            </table></div>
+          </div>
+
+          <!-- Ingresos -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:10px">↑ Otros Ingresos Operativos</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Cliente</th><th>Movimientos</th><th class="hide-mobile">Categorías</th><th class="hide-mobile"></th><th class="mono">Total</th></tr></thead>
+              <tbody id="rpt-ing-tbody"></tbody>
+            </table></div>
+          </div>
+
+          <!-- No operativos -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:10px">🔄 Ingresos No Operativos</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Fecha</th><th>Descripción</th><th class="hide-mobile">F.Pago</th><th class="mono">Monto</th></tr></thead>
+              <tbody id="rpt-noop-tbody"></tbody>
+            </table></div>
+          </div>
+
+          <!-- Gastos por categoría -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:10px">↓ Gastos por Categoría</div>
+            <div id="rpt-gastos-bars" style="margin-bottom:14px"></div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Categoría</th><th class="hide-mobile">Subcategoría</th><th>Mov.</th><th class="mono">Total</th><th>%</th></tr></thead>
+              <tbody id="rpt-cat-tbody"></tbody>
+            </table></div>
+          </div>
+
+          <!-- Detalle gastos -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:10px">↓ Detalle de Gastos</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Categoría / Proveedor</th><th>Movimientos</th><th class="hide-mobile">Local</th><th class="hide-mobile" colspan="2"></th><th class="mono">Total</th></tr></thead>
+              <tbody id="rpt-gas-tbody"></tbody>
+            </table></div>
+          </div>
+
+          <!-- Obligaciones -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:10px">📅 Obligaciones del Mes</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Obligación</th><th>Instancias</th><th class="mono">Pagado</th><th class="mono">Pendiente</th><th class="mono">Total</th></tr></thead>
+              <tbody id="rpt-obl-tbody"></tbody>
+            </table></div>
+          </div>
+
+          <!-- Cheques -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-title" style="margin-bottom:10px">📄 Cheques del Mes</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Tipo</th><th>Proveedor/Titular</th><th class="hide-mobile">N°</th><th class="hide-mobile">Banco</th><th>F.Cobro</th><th>Estado</th><th class="mono">Monto</th></tr></thead>
+              <tbody id="rpt-chq-tbody"></tbody>
+            </table></div>
+          </div>
+
+          <!-- Exportar -->
+          <div class="card">
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="rptExportarPDF()">📄 Descargar PDF</button>
+              <button class="btn btn-secondary" onclick="rptExportarExcel()">📊 Descargar Excel</button>
+            </div>
           </div>
         </div>
       </div>
@@ -2075,6 +2179,7 @@ function undoLastAction() {
     'page-proveedores': renderProveedores, 'page-clientes': renderClientes,
     'page-categorias': renderCategorias,
     'page-analisis': () => initAnalisis(),
+    'page-reporte': () => initReporte(),
   }[pid] || (()=>{}))();
   updateTopbar();
   showToast('↩ Acción deshecha');
@@ -2277,7 +2382,7 @@ function navigate(page) {
     cheques: 'Cheques', obligaciones: 'Obligaciones', cajas: 'Caja de Locales',
     flujo: 'Flujo de Fondos', proveedores: 'Proveedores', clientes: 'Clientes',
     transferencias: 'Transferencias',
-    locales: 'Mis Locales', categorias: 'Categorías', analisis: 'Análisis'
+    locales: 'Mis Locales', categorias: 'Categorías', analisis: 'Análisis', reporte: 'Reporte Mensual'
   };
   document.getElementById('topbar-title').textContent = titles[page] || page;
   updateBottomNav(page);
@@ -2315,6 +2420,7 @@ function today() {
 function thisMonth() { return new Date().toISOString().slice(0,7); }
 function getLocalNombre(id) { const l = state.locales.find(x=>x.id===id); return l ? l.nombre : '-'; }
 function getProvNombre(id) { const p = state.proveedores.find(x=>x.id===id); return p ? p.nombre : '-'; }
+function getCliNombre(id) { const c = state.clientes.find(x=>x.id===id); return c ? c.nombre : '-'; }
 
 function tagPago(p) {
   if (p === 'efectivo') return '<span class="tag-efectivo">💵 Efectivo</span>';
@@ -2834,7 +2940,7 @@ function renderMovimientos(tipo) {
     <td class="hide-mobile" style="color:var(--text3);font-size:12px">${m.subcat||'-'}</td>
     <td>${tagPago(m.pago)}</td>
     <td class="hide-mobile" style="font-size:12px">${getLocalNombre(m.localId)}</td>
-    <td class="hide-mobile" style="font-size:12px">${hl(getProvNombre(m.provId))}</td>
+    <td class="hide-mobile" style="font-size:12px">${tipo==='ingresos' ? hl(getCliNombre(m.clienteId||m.cliId)) : hl(getProvNombre(m.provId))}</td>
     <td class="mono" style="color:${tipo==='ingresos'?'var(--green)':'var(--red)'};font-weight:600">${fmt(m.monto)}</td>
     <td style="display:flex;gap:4px">
       <button class="btn btn-icon btn-sm" onclick="editarMov('${tipo}','${m.id}')">✏</button>
@@ -4476,6 +4582,322 @@ function renderAnalisis() {
 }
 
 
+// ========================= REPORTE MENSUAL =========================
+let _rptData = null;
+
+function initReporte() {
+  const sel = document.getElementById('rpt-mes-sel');
+  if (sel && !sel.value) sel.value = thisMonth();
+}
+
+function cargarReporte() {
+  const mes = document.getElementById('rpt-mes-sel')?.value || thisMonth();
+  const [y,m] = mes.split('-').map(Number);
+  const label = new Date(y,m-1,1).toLocaleString('es-AR',{month:'long',year:'numeric'});
+  document.getElementById('rpt-mes-label').textContent = label.charAt(0).toUpperCase()+label.slice(1);
+
+  const cajasMes = state.cajas.filter(c=>c.fecha&&c.fecha.startsWith(mes));
+  const ingMes   = state.ingresos.filter(i=>i.fecha&&i.fecha.startsWith(mes));
+  const gasMes   = state.gastos.filter(g=>g.fecha&&g.fecha.startsWith(mes)&&!g._oblId&&!g._chqId);
+  const oblMes   = state.oblInstancias.filter(i=>i.periodo===mes||(i.fechaVto&&i.fechaVto.startsWith(mes)));
+  const chqMes   = state.cheques.filter(c=>c.cobro&&c.cobro.startsWith(mes));
+
+  const ingOp   = ingMes.filter(i=>(i.tipo||'operativo')==='operativo'&&!i._cajaDepositoId);
+  const ingNoOp = ingMes.filter(i=>i.tipo==='no_operativo');
+  const totalCajas   = cajasMes.reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
+  const totalIngOp   = ingOp.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalIngReal = totalCajas + totalIngOp;
+  const totalGas     = gasMes.reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalOblPag  = oblMes.filter(o=>o.estado==='pagado').reduce((a,b)=>a+parseFloat(b.montoPagado||b.monto||0),0);
+  const totalOblPend = oblMes.filter(o=>o.estado==='pendiente').reduce((a,b)=>a+parseFloat(b.monto||0),0);
+  const totalEgr     = totalGas + totalOblPag;
+  const resultado    = totalIngReal - totalEgr;
+
+  const gasCats = {};
+  gasMes.forEach(g=>{
+    const key=(g.cat||'Sin categoría')+'|||'+(g.subcat||'');
+    if(!gasCats[key]) gasCats[key]={cat:g.cat||'Sin categoría',sub:g.subcat||'',total:0,n:0};
+    gasCats[key].total+=parseFloat(g.monto||0); gasCats[key].n++;
+  });
+  const catRows = Object.values(gasCats).sort((a,b)=>b.total-a.total);
+  const cajasRows = [...new Set(cajasMes.map(c=>c.localId))].map(lid=>{
+    const locs=cajasMes.filter(c=>c.localId===lid);
+    const total=locs.reduce((a,b)=>a+parseFloat(b.totalReal||0),0);
+    return {local:getLocalNombre(lid)||lid,dias:locs.length,total,prom:Math.round(total/locs.length)};
+  }).sort((a,b)=>b.total-a.total);
+
+  _rptData={mes,label,cajasRows,ingOp,ingNoOp,gasMes,catRows,oblMes,chqMes,
+    totalCajas,totalIngOp,totalIngReal,totalGas,totalOblPag,totalOblPend,totalEgr,resultado};
+
+  document.getElementById('rpt-stats').innerHTML=[
+    {l:'Ventas Locales',v:fmt(totalCajas),c:'var(--green)'},
+    {l:'Otros Ingresos',v:fmt(totalIngOp),c:'var(--green)'},
+    {l:'Total Ingresos',v:fmt(totalIngReal),c:'var(--green)'},
+    {l:'Total Gastos',v:fmt(totalGas),c:'var(--red)'},
+    {l:'Obligaciones Pagas',v:fmt(totalOblPag),c:'var(--red)'},
+    {l:'Total Egresos',v:fmt(totalEgr),c:'var(--red)'},
+    {l:'Resultado Neto',v:fmt(resultado),c:resultado>=0?'var(--green)':'var(--red)'},
+    {l:'Oblig. Pendientes',v:fmt(totalOblPend),c:'var(--accent)'},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.l}</div><div class="stat-value" style="color:${s.c};font-size:18px">${s.v}</div></div>`).join('');
+
+  const maxCaja=Math.max(...cajasRows.map(r=>r.total),1);
+  document.getElementById('rpt-cajas-bars').innerHTML=cajasRows.map(r=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="width:130px;font-size:12px;color:var(--text2)">${r.local}</div>
+      <div style="flex:1;background:var(--border);border-radius:3px;height:14px">
+        <div style="width:${r.total/maxCaja*100}%;background:var(--green);height:14px;border-radius:3px"></div></div>
+      <div style="width:100px;text-align:right;font-family:monospace;font-size:12px;color:var(--green)">${fmt(r.total)}</div>
+    </div>`).join('');
+  document.getElementById('rpt-cajas-tbody').innerHTML=
+    cajasRows.map(r=>`<tr><td>${r.local}</td><td>${r.dias}</td><td class="hide-mobile mono">${fmt(r.prom)}</td><td class="mono" style="color:var(--green)">${fmt(r.total)}</td></tr>`).join('')+
+    `<tr style="font-weight:700;background:var(--surface2)"><td>TOTAL</td><td>${cajasMes.length}</td><td class="hide-mobile">-</td><td class="mono" style="color:var(--green)">${fmt(totalCajas)}</td></tr>`;
+
+  document.getElementById('rpt-ing-tbody').innerHTML = (() => {
+    if (!ingOp.length) return '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Sin otros ingresos operativos</td></tr>';
+    // Agrupar por cliente
+    const porCli = {};
+    ingOp.forEach(i=>{
+      const cliId = i.clienteId||i.cliId||'';
+      const cliNombre = getCliNombre(cliId)||'Sin cliente';
+      if (!porCli[cliNombre]) porCli[cliNombre]={nombre:cliNombre,total:0,n:0,cat:new Set()};
+      porCli[cliNombre].total+=parseFloat(i.monto||0);
+      porCli[cliNombre].n++;
+      if (i.cat) porCli[cliNombre].cat.add(i.cat);
+    });
+    const rows = Object.values(porCli).sort((a,b)=>b.total-a.total);
+    const totalOp = rows.reduce((a,r)=>a+r.total,0);
+    return rows.map(r=>`<tr>
+      <td><strong>${r.nombre}</strong></td>
+      <td>${r.n} movimientos</td>
+      <td class="hide-mobile" style="color:var(--text3)">${[...r.cat].join(', ')||'-'}</td>
+      <td class="hide-mobile"></td>
+      <td class="mono" style="color:var(--green);font-weight:700">${fmt(r.total)}</td></tr>`).join('')+
+      `<tr style="font-weight:700;background:var(--surface2)"><td>TOTAL</td><td>${ingOp.length} mov.</td><td class="hide-mobile" colspan="2"></td><td class="mono" style="color:var(--green)">${fmt(totalOp)}</td></tr>`;
+  })();
+
+  document.getElementById('rpt-noop-tbody').innerHTML=ingNoOp.length
+    ?ingNoOp.map(i=>`<tr><td style="font-size:12px">${fmtDate(i.fecha)}</td><td>${i.desc||'-'}</td>
+      <td class="hide-mobile">${tagPago(i.pago)}</td>
+      <td class="mono" style="color:var(--text3)">${fmt(i.monto)}</td></tr>`).join('')
+    :'<tr><td colspan="4" style="text-align:center;color:var(--text3)">Sin ingresos no operativos</td></tr>';
+
+  const maxGas=Math.max(...catRows.map(r=>r.total),1);
+  document.getElementById('rpt-gastos-bars').innerHTML=catRows.slice(0,8).map(r=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="width:160px;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.cat}${r.sub?' › '+r.sub:''}</div>
+      <div style="flex:1;background:var(--border);border-radius:3px;height:14px">
+        <div style="width:${r.total/maxGas*100}%;background:var(--red);height:14px;border-radius:3px"></div></div>
+      <div style="width:100px;text-align:right;font-family:monospace;font-size:12px;color:var(--red)">${fmt(r.total)}</div>
+    </div>`).join('');
+  document.getElementById('rpt-cat-tbody').innerHTML=
+    catRows.map(r=>`<tr><td><strong>${r.cat}</strong></td><td class="hide-mobile" style="color:var(--text3)">${r.sub||'-'}</td>
+      <td>${r.n}</td><td class="mono" style="color:var(--red)">${fmt(r.total)}</td>
+      <td style="color:var(--text3)">${(r.total/totalGas*100).toFixed(1)}%</td></tr>`).join('')+
+    `<tr style="font-weight:700;background:var(--surface2)"><td colspan="3">TOTAL</td><td class="mono" style="color:var(--red)">${fmt(totalGas)}</td><td>100%</td></tr>`;
+
+  // Gastos agrupados por categoría y subcategoría (ya en rpt-cat-tbody)
+  // En rpt-gas-tbody mostramos subtotales por cat > subcat
+  document.getElementById('rpt-gas-tbody').innerHTML = (() => {
+    if (!gasMes.length) return '<tr><td colspan="6" style="text-align:center;color:var(--text3)">Sin gastos en este mes</td></tr>';
+    let html = '';
+    catRows.forEach(r=>{
+      const movs = gasMes.filter(g=>(g.cat||'Sin categoría')===r.cat&&(g.subcat||'')===r.sub);
+      html += `<tr style="background:var(--surface2)">
+        <td colspan="2"><strong>${r.cat}</strong>${r.sub?' <span style="color:var(--text3)">› '+r.sub+'</span>':''}</td>
+        <td class="hide-mobile" style="color:var(--text3)">${r.n} movimientos</td>
+        <td class="hide-mobile"></td><td class="hide-mobile"></td>
+        <td class="mono" style="color:var(--red);font-weight:700">${fmt(r.total)}</td></tr>`;
+      // Agrupar por proveedor dentro de la subcategoría
+      const porProv = {};
+      movs.forEach(g=>{
+        const k = getProvNombre(g.provId)||g.desc||'Sin proveedor';
+        if (!porProv[k]) porProv[k]={total:0,n:0,local:new Set()};
+        porProv[k].total+=parseFloat(g.monto||0); porProv[k].n++;
+        if (g.localId) porProv[k].local.add(getLocalNombre(g.localId));
+      });
+      Object.entries(porProv).sort((a,b)=>b[1].total-a[1].total).forEach(([prov,d])=>{
+        html += `<tr><td style="padding-left:20px;color:var(--text3);font-size:12px">${prov}</td>
+          <td style="font-size:12px;color:var(--text3)">${d.n} mov.</td>
+          <td class="hide-mobile" style="font-size:11px;color:var(--text3)">${[...d.local].join(', ')||'-'}</td>
+          <td class="hide-mobile" colspan="2"></td>
+          <td class="mono" style="color:var(--red);font-size:12px">${fmt(d.total)}</td></tr>`;
+      });
+    });
+    html += `<tr style="font-weight:700;background:var(--surface)"><td colspan="5">TOTAL GASTOS</td><td class="mono" style="color:var(--red)">${fmt(totalGas)}</td></tr>`;
+    return html;
+  })();
+
+  // Obligaciones agrupadas por nombre de obligación
+  document.getElementById('rpt-obl-tbody').innerHTML = (() => {
+    if (!oblMes.length) return '<tr><td colspan="5" style="text-align:center;color:var(--text3)">Sin obligaciones en este mes</td></tr>';
+    const porNombre = {};
+    oblMes.forEach(o=>{
+      const k = o.oblDesc||'Sin nombre';
+      if (!porNombre[k]) porNombre[k]={desc:k,pagado:0,pendiente:0,nPag:0,nPend:0};
+      if (o.estado==='pagado') { porNombre[k].pagado+=parseFloat(o.montoPagado||o.monto||0); porNombre[k].nPag++; }
+      else if (o.estado==='pendiente') { porNombre[k].pendiente+=parseFloat(o.monto||0); porNombre[k].nPend++; }
+    });
+    return Object.values(porNombre).sort((a,b)=>(b.pagado+b.pendiente)-(a.pagado+a.pendiente)).map(r=>`<tr>
+      <td><strong>${r.desc}</strong></td>
+      <td><span class="badge" style="color:var(--green)">${r.nPag} pagas</span> ${r.nPend>0?`<span class="badge" style="color:var(--red);margin-left:4px">${r.nPend} pend.</span>`:''}</td>
+      <td class="mono" style="color:var(--green)">${r.pagado>0?fmt(r.pagado):'-'}</td>
+      <td class="mono" style="color:var(--red)">${r.pendiente>0?fmt(r.pendiente):'-'}</td>
+      <td class="mono" style="font-weight:700">${fmt(r.pagado+r.pendiente)}</td></tr>`).join('')+
+      `<tr style="font-weight:700;background:var(--surface2)">
+        <td>TOTAL</td><td></td>
+        <td class="mono" style="color:var(--green)">${fmt(oblMes.filter(o=>o.estado==='pagado').reduce((a,b)=>a+parseFloat(b.montoPagado||b.monto||0),0))}</td>
+        <td class="mono" style="color:var(--red)">${fmt(totalOblPend)}</td>
+        <td class="mono">${fmt(totalOblPag+totalOblPend)}</td></tr>`;
+  })();
+
+  document.getElementById('rpt-chq-tbody').innerHTML=chqMes.length
+    ?[...chqMes].sort((a,b)=>a.cobro>b.cobro?1:-1).map(c=>`<tr>
+      <td><span class="badge badge-gray">${c.tipo}</span></td>
+      <td>${getProvNombre(c.provId)||c.titular||'-'}</td>
+      <td class="hide-mobile" style="font-size:12px">${c.numero||'-'}</td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--text3)">${c.banco||'-'}</td>
+      <td style="font-size:12px">${fmtDate(c.cobro)}</td>
+      <td><span class="badge" style="color:${c.estado==='cobrado'?'var(--green)':'var(--orange)'}">${c.estado}</span></td>
+      <td class="mono">${fmt(c.monto)}</td></tr>`).join('')
+    :'<tr><td colspan="7" style="text-align:center;color:var(--text3)">Sin cheques en este mes</td></tr>';
+
+  document.getElementById('rpt-preview').style.display='block';
+}
+
+function rptExportarPDF() {
+  if (!_rptData) return alert('Generá el reporte primero');
+  const { jsPDF } = window.jspdf;
+  if (!jsPDF) return alert('Librería PDF no cargada, esperá unos segundos y reintentá');
+  const d=_rptData;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=doc.internal.pageSize.getWidth();
+  doc.setFillColor(15,15,17); doc.rect(0,0,W,30,'F');
+  doc.setTextColor(240,192,64); doc.setFontSize(18); doc.setFont('helvetica','bold');
+  doc.text('GestiónPro — Reporte Mensual',14,14);
+  doc.setFontSize(11); doc.setFont('helvetica','normal'); doc.setTextColor(144,144,168);
+  doc.text(d.label.charAt(0).toUpperCase()+d.label.slice(1),14,22);
+  doc.setTextColor(100,100,120);
+  doc.text('Generado: '+new Date().toLocaleDateString('es-AR'),W-14,22,{align:'right'});
+  let y=38;
+  const T=(t)=>{doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(240,192,64);doc.text(t,14,y);y+=7;};
+  const statsArr=[
+    ['Ventas Locales',fmt(d.totalCajas),[64,192,128]],
+    ['Otros Ingresos Op.',fmt(d.totalIngOp),[64,192,128]],
+    ['Total Ingresos',fmt(d.totalIngReal),[64,192,128]],
+    ['Total Gastos',fmt(d.totalGas),[224,88,88]],
+    ['Oblig. Pagadas',fmt(d.totalOblPag),[224,88,88]],
+    ['Total Egresos',fmt(d.totalEgr),[224,88,88]],
+    ['Resultado Neto',fmt(d.resultado),d.resultado>=0?[64,192,128]:[224,88,88]],
+    ['Oblig. Pendientes',fmt(d.totalOblPend),[240,192,64]],
+  ];
+  T('RESUMEN EJECUTIVO');
+  const cW=(W-28)/2;
+  statsArr.forEach((s,i)=>{
+    const cx=14+(i%2)*cW,cy=y+Math.floor(i/2)*14;
+    doc.setFillColor(30,30,36); doc.roundedRect(cx,cy,cW-4,12,2,2,'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(144,144,168);
+    doc.text(s[0],cx+4,cy+5);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...s[2]);
+    doc.text(s[1],cx+cW-8,cy+9,{align:'right'});
+  });
+  y+=Math.ceil(statsArr.length/2)*14+8;
+  T('VENTAS POR LOCAL');
+  doc.autoTable({startY:y,margin:{left:14,right:14},
+    head:[['Local','Días','Promedio/día','Total']],
+    body:d.cajasRows.map(r=>[r.local,r.dias,fmt(r.prom),fmt(r.total)]).concat([['TOTAL','-','-',fmt(d.totalCajas)]]),
+    headStyles:{fillColor:[30,30,40],textColor:[144,144,168],fontSize:9},
+    bodyStyles:{fillColor:[24,24,28],textColor:[232,232,240],fontSize:10},
+    alternateRowStyles:{fillColor:[28,28,34]},
+    columnStyles:{3:{textColor:[64,192,128],fontStyle:'bold'}}});
+  y=doc.lastAutoTable.finalY+8;
+  if(y>200){doc.addPage();y=20;}
+  T('GASTOS POR CATEGORÍA');
+  doc.autoTable({startY:y,margin:{left:14,right:14},
+    head:[['Categoría','Subcategoría','Mov.','Total','%']],
+    body:d.catRows.map(r=>[r.cat,r.sub||'-',r.n,fmt(r.total),(r.total/d.totalGas*100).toFixed(1)+'%']).concat([['TOTAL','',d.gasMes.length,fmt(d.totalGas),'100%']]),
+    headStyles:{fillColor:[30,30,40],textColor:[144,144,168],fontSize:9},
+    bodyStyles:{fillColor:[24,24,28],textColor:[232,232,240],fontSize:10},
+    alternateRowStyles:{fillColor:[28,28,34]},
+    columnStyles:{3:{textColor:[224,88,88],fontStyle:'bold'}}});
+  y=doc.lastAutoTable.finalY+8;
+  if(y>180){doc.addPage();y=20;}
+  T('DETALLE DE GASTOS');
+  doc.autoTable({startY:y,margin:{left:14,right:14},
+    head:[['Fecha','Descripción','Categoría','Local','F.Pago','Monto']],
+    body:[...d.gasMes].sort((a,b)=>a.fecha>b.fecha?1:-1).map(g=>[
+      fmtDate(g.fecha),g.desc||getProvNombre(g.provId)||'-',g.cat||'-',getLocalNombre(g.localId)||'-',g.pago||'-',fmt(g.monto)]),
+    headStyles:{fillColor:[30,30,40],textColor:[144,144,168],fontSize:9},
+    bodyStyles:{fillColor:[24,24,28],textColor:[232,232,240],fontSize:9},
+    alternateRowStyles:{fillColor:[28,28,34]},
+    columnStyles:{5:{textColor:[224,88,88],fontStyle:'bold'}}});
+  y=doc.lastAutoTable.finalY+8;
+  if(y>200){doc.addPage();y=20;}
+  T('OBLIGACIONES DEL MES');
+  doc.autoTable({startY:y,margin:{left:14,right:14},
+    head:[['Obligación','Vencimiento','Estado','Pagado el','Monto']],
+    body:[...d.oblMes].sort((a,b)=>(a.fechaVto||'')>(b.fechaVto||'')?1:-1)
+      .map(o=>[o.oblDesc||'-',fmtDate(o.fechaVto),o.estado,fmtDate(o.fechaPago),fmt(o.montoPagado||o.monto)]),
+    headStyles:{fillColor:[30,30,40],textColor:[144,144,168],fontSize:9},
+    bodyStyles:{fillColor:[24,24,28],textColor:[232,232,240],fontSize:9},
+    alternateRowStyles:{fillColor:[28,28,34]}});
+  const pg=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pg;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(100,100,120);doc.text('GestiónPro — '+d.label+' | Pág. '+i+' de '+pg,W/2,290,{align:'center'});}
+  doc.save('Reporte-GestionPro-'+d.mes+'.pdf');
+}
+
+function rptExportarExcel() {
+  if (!_rptData) return alert('Generá el reporte primero');
+  if (typeof XLSX==='undefined') return alert('Librería Excel no cargada');
+  const d=_rptData; const wb=XLSX.utils.book_new();
+  const a=(data,name,cols)=>{const ws=XLSX.utils.aoa_to_sheet(data);ws['!cols']=cols;XLSX.utils.book_append_sheet(wb,ws,name);};
+  a([['GestiónPro — Reporte Mensual',d.label],[],['Concepto','Monto'],
+    ['Ventas por cajas',d.totalCajas],['Otros ingresos op.',d.totalIngOp],['Total ingresos',d.totalIngReal],
+    ['Total gastos',d.totalGas],['Obligaciones pagas',d.totalOblPag],['Total egresos',d.totalEgr],
+    ['Resultado neto',d.resultado],['Oblig. pendientes',d.totalOblPend]],
+    'Resumen',[{wch:30},{wch:18}]);
+  a([['Local','Días','Prom/día','Total'],...d.cajasRows.map(r=>[r.local,r.dias,r.prom,r.total]),
+    ['TOTAL',d.cajasRows.reduce((a,r)=>a+r.dias,0),'',d.totalCajas]],
+    'Cajas por Local',[{wch:20},{wch:8},{wch:14},{wch:14}]);
+  a([['Categoría','Subcategoría','Mov.','Total','%'],...d.catRows.map(r=>[r.cat,r.sub||'-',r.n,r.total,(r.total/d.totalGas*100).toFixed(2)+'%']),
+    ['TOTAL','',d.gasMes.length,d.totalGas,'100%']],
+    'Gastos x Categoría',[{wch:22},{wch:18},{wch:8},{wch:14},{wch:10}]);
+  a([['Fecha','Descripción','Categoría','Subcategoría','Local','F.Pago','Monto'],
+    ...[...d.gasMes].sort((a,b)=>a.fecha>b.fecha?1:-1).map(g=>[g.fecha,g.desc||getProvNombre(g.provId)||'-',g.cat||'-',g.subcat||'-',getLocalNombre(g.localId)||'-',g.pago||'-',parseFloat(g.monto||0)])],
+    'Detalle Gastos',[{wch:12},{wch:26},{wch:18},{wch:18},{wch:16},{wch:12},{wch:14}]);
+  // Ingresos agrupados por cliente
+  const porCliExcel = {};
+  d.ingOp.forEach(i=>{
+    const k = getCliNombre(i.clienteId||i.cliId)||'Sin cliente';
+    if (!porCliExcel[k]) porCliExcel[k]={nombre:k,total:0,n:0};
+    porCliExcel[k].total+=parseFloat(i.monto||0); porCliExcel[k].n++;
+  });
+  a([['Cliente','Movimientos','Total (Op.)'],
+    ...Object.values(porCliExcel).sort((a,b)=>b.total-a.total).map(r=>[r.nombre,r.n,r.total]),
+    ['TOTAL',d.ingOp.length,d.totalIngOp],
+    [],['Ingresos No Operativos','',''],
+    ['Fecha','Descripción','Monto'],
+    ...d.ingNoOp.map(i=>[i.fecha,i.desc||'-',parseFloat(i.monto||0)]),
+  ], 'Ingresos',[{wch:28},{wch:14},{wch:16}]);
+
+  // Obligaciones agrupadas
+  const porOblExcel = {};
+  d.oblMes.forEach(o=>{
+    const k=o.oblDesc||'Sin nombre';
+    if (!porOblExcel[k]) porOblExcel[k]={desc:k,pagado:0,pendiente:0,nPag:0,nPend:0};
+    if (o.estado==='pagado'){porOblExcel[k].pagado+=parseFloat(o.montoPagado||o.monto||0);porOblExcel[k].nPag++;}
+    else if(o.estado==='pendiente'){porOblExcel[k].pendiente+=parseFloat(o.monto||0);porOblExcel[k].nPend++;}
+  });
+  a([['Obligación','Pagas','Pagado','Pendiente','Total'],
+    ...Object.values(porOblExcel).sort((a,b)=>(b.pagado+b.pendiente)-(a.pagado+a.pendiente))
+      .map(r=>[r.desc,r.nPag,r.pagado,r.pendiente,r.pagado+r.pendiente]),
+    ['TOTAL','',d.totalOblPag,d.totalOblPend,d.totalOblPag+d.totalOblPend],
+  ], 'Obligaciones',[{wch:28},{wch:8},{wch:16},{wch:16},{wch:16}]);
+  a([['Tipo','Proveedor/Titular','N°','Banco','F.Cobro','Estado','Monto'],
+    ...[...d.chqMes].sort((a,b)=>a.cobro>b.cobro?1:-1).map(c=>[c.tipo,getProvNombre(c.provId)||c.titular||'-',c.numero||'-',c.banco||'-',c.cobro||'-',c.estado,parseFloat(c.monto||0)])],
+    'Cheques',[{wch:10},{wch:22},{wch:10},{wch:14},{wch:12},{wch:10},{wch:14}]);
+  XLSX.writeFile(wb,'Reporte-GestionPro-'+d.mes+'.xlsx');
+}
+
 function renderLocales() {
   // Llenar campos de apertura
   const p = state.parametros || {};
@@ -5590,6 +6012,7 @@ Object.assign(window, {
   del, renderCajas, renderCategorias, renderLocales, renderObligaciones,
   guardarParametros, renderParamPreview,
   initAnalisis, renderAnalisis, limpiarAnalisis, anFillCat, anFillSubcat, anProvSearch, anSelectProv, anHideProv,
+  initReporte, cargarReporte, rptExportarPDF, rptExportarExcel,
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv, agregarProvRapido,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
