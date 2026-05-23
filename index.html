@@ -1525,6 +1525,23 @@
         <label>Local</label>
         <select id="obl-local"></select>
       </div>
+      <div class="form-group full" style="background:var(--surface2);border-radius:8px;padding:12px;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+          <input type="checkbox" id="obl-recordatorio" onchange="toggleRecordatorioDias()" style="width:auto;margin:0">
+          <span>🔔 Recordarme el vencimiento</span>
+        </label>
+        <div id="obl-recordatorio-dias-wrap" style="display:none;margin-top:10px">
+          <label style="font-size:12px">Avisarme</label>
+          <select id="obl-recordatorio-dias" style="width:auto">
+            <option value="0">El mismo día</option>
+            <option value="1">1 día antes</option>
+            <option value="2">2 días antes</option>
+            <option value="3" selected>3 días antes</option>
+            <option value="5">5 días antes</option>
+            <option value="7">1 semana antes</option>
+          </select>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-obligacion')">Cancelar</button>
@@ -2346,6 +2363,25 @@ function calcularAlertas() {
         titulo:'Obligación vencida',
         detalle:(i.oblDesc||'Obligación')+' · '+fmt(i.monto)+' · venció '+fmtDate(i.fechaVto),
         fecha:i.fechaVto, accion:()=>navigate('flujo')});
+    });
+
+  // Obligaciones con recordatorio activado — avisar según los días configurados
+  state.oblInstancias.filter(i=>i.estado==='pendiente'&&i.fechaVto&&i.fechaVto>=hoy)
+    .forEach(i=>{
+      const obl = state.obligaciones.find(o=>o.id===i.oblId);
+      if (!obl || !obl.recordatorio) return;
+      const diasAviso = obl.recordatorioDias != null ? obl.recordatorioDias : 3;
+      const fechaAviso = new Date(i.fechaVto+'T12:00:00');
+      fechaAviso.setDate(fechaAviso.getDate() - diasAviso);
+      const fechaAvisoStr = fechaAviso.getFullYear()+'-'+(fechaAviso.getMonth()+1+'').padStart(2,'0')+'-'+(fechaAviso.getDate()+'').padStart(2,'0');
+      // Mostrar la alerta solo si ya llegó la fecha de aviso
+      if (hoy >= fechaAvisoStr) {
+        const dias = Math.round((new Date(i.fechaVto)-new Date(hoy))/86400000);
+        alertas.push({alertaId:'oblr-'+i.id,tipo:'obl-recordatorio',prioridad:dias<=1?'alta':'media',icon:'🔔',color:'var(--orange)',
+          titulo:'Obligación por pagar'+(dias===0?' HOY':dias===1?' mañana':' en '+dias+' días'),
+          detalle:(i.oblDesc||'Obligación')+' · '+fmt(i.monto),
+          fecha:i.fechaVto, accion:()=>navigate('flujo')});
+      }
     });
 
   alertas.sort((a,b)=>(a.fecha||'')>(b.fecha||'')?1:-1);
@@ -3471,6 +3507,11 @@ function editarObl(id) {
   document.getElementById('obl-dia').value = o.dia || '';
   if (o.diaSemana != null) document.getElementById('obl-dia-semana').value = o.diaSemana;
   if (o.fechaUnica) document.getElementById('obl-fecha-unica').value = o.fechaUnica;
+  const chkRec = document.getElementById('obl-recordatorio');
+  if (chkRec) chkRec.checked = o.recordatorio || false;
+  const recDias = document.getElementById('obl-recordatorio-dias');
+  if (recDias) recDias.value = o.recordatorioDias != null ? o.recordatorioDias : 3;
+  toggleRecordatorioDias();
   toggleOblDia();
   document.getElementById('obl-monto').value = o.monto || '';
   document.getElementById('obl-pago').value = o.pago || 'efectivo';
@@ -4616,6 +4657,8 @@ function openModal(id) {
     ['obl-desc','obl-dia','obl-monto'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=''; });
     const ps=document.getElementById('obl-proveedor-search'); if(ps) ps.value='';
     const ph=document.getElementById('obl-proveedor'); if(ph) ph.value='';
+    const rec=document.getElementById('obl-recordatorio'); if(rec) rec.checked=false;
+    toggleRecordatorioDias();
   }
   document.getElementById(id).style.display='flex';
 }
@@ -4817,6 +4860,12 @@ function fillProvSubcat() {
 }
 
 // Autocompleta categoría y subcategoría al elegir proveedor en gasto
+function toggleRecordatorioDias() {
+  const chk = document.getElementById('obl-recordatorio');
+  const wrap = document.getElementById('obl-recordatorio-dias-wrap');
+  if (wrap) wrap.style.display = chk && chk.checked ? 'block' : 'none';
+}
+
 function toggleOblDia() {
   const freq = document.getElementById('obl-freq').value;
   document.getElementById('obl-dia-wrap-mensual').style.display = freq==='mensual' ? '' : 'none';
@@ -4999,6 +5048,8 @@ function saveObligacion() {
     pago: document.getElementById('obl-pago').value,
     localId: document.getElementById('obl-local').value || null,
     provId: document.getElementById('obl-proveedor').value || null,
+    recordatorio: document.getElementById('obl-recordatorio')?.checked || false,
+    recordatorioDias: parseInt(document.getElementById('obl-recordatorio-dias')?.value || 3),
   };
   if (!data.desc || !data.monto) return alert('Completá descripción y monto');
   if (freq==='unica' && !fechaUnica) return alert('Ingresá la fecha de vencimiento');
@@ -5358,7 +5409,7 @@ Object.assign(window, {
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv, agregarProvRapido,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
-  autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleInstancias, setInstFilter, setInstFreq,
+  autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleRecordatorioDias, toggleInstancias, setInstFilter, setInstFreq,
   cajRecalc, cajCheckGastos, cajAgregarGasto, cajEliminarGasto, cajGastoChange, cajSetMonto, cajSetDesc, renderFlujo, abrirAjusteObl, guardarAjusteObl,
   marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
 });
