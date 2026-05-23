@@ -2325,7 +2325,7 @@ function calcularAlertas() {
     .forEach(c=>{
       const prov = state.proveedores.find(p=>p.id===c.provId);
       const dias = Math.round((new Date(c.cobro)-new Date(hoy))/86400000);
-      alertas.push({tipo:'cheque',prioridad:dias<=1?'alta':'media',icon:'📄',color:'var(--orange)',
+      alertas.push({alertaId:'chq-'+c.id,tipo:'cheque',prioridad:dias<=1?'alta':'media',icon:'📄',color:'var(--orange)',
         titulo:'Cheque por pagar'+(dias===0?' HOY':dias===1?' mañana':' en '+dias+' días'),
         detalle:(prov?prov.nombre:c.titular||'N° '+c.numero)+' · '+fmt(c.monto),
         fecha:c.cobro, accion:()=>navigate('cheques')});
@@ -2334,7 +2334,7 @@ function calcularAlertas() {
   state.cheques.filter(c=>c.estado==='pendiente'&&c.tipo==='emitido'&&c.cobro&&c.cobro<hoy)
     .forEach(c=>{
       const prov = state.proveedores.find(p=>p.id===c.provId);
-      alertas.push({tipo:'cheque-vencido',prioridad:'alta',icon:'⚠️',color:'var(--red)',
+      alertas.push({alertaId:'chqv-'+c.id,tipo:'cheque-vencido',prioridad:'alta',icon:'⚠️',color:'var(--red)',
         titulo:'Cheque VENCIDO sin pagar',
         detalle:(prov?prov.nombre:c.titular||'N° '+c.numero)+' · '+fmt(c.monto)+' · venció '+fmtDate(c.cobro),
         fecha:c.cobro, accion:()=>navigate('cheques')});
@@ -2342,18 +2342,9 @@ function calcularAlertas() {
 
   state.oblInstancias.filter(i=>i.estado==='pendiente'&&i.fechaVto&&i.fechaVto<hoy)
     .forEach(i=>{
-      alertas.push({tipo:'obl-vencida',prioridad:'alta',icon:'⚠️',color:'var(--red)',
+      alertas.push({alertaId:'oblv-'+i.id,tipo:'obl-vencida',prioridad:'alta',icon:'⚠️',color:'var(--red)',
         titulo:'Obligación vencida',
         detalle:(i.oblDesc||'Obligación')+' · '+fmt(i.monto)+' · venció '+fmtDate(i.fechaVto),
-        fecha:i.fechaVto, accion:()=>navigate('flujo')});
-    });
-
-  state.oblInstancias.filter(i=>i.estado==='pendiente'&&i.fechaVto&&i.fechaVto>=hoy&&i.fechaVto<=en3Str)
-    .forEach(i=>{
-      const dias = Math.round((new Date(i.fechaVto)-new Date(hoy))/86400000);
-      alertas.push({tipo:'obl-proxima',prioridad:dias<=1?'alta':'media',icon:'📅',color:'var(--orange)',
-        titulo:'Obligación por pagar'+(dias===0?' HOY':dias===1?' mañana':' en '+dias+' días'),
-        detalle:(i.oblDesc||'Obligación')+' · '+fmt(i.monto),
         fecha:i.fechaVto, accion:()=>navigate('flujo')});
     });
 
@@ -2362,14 +2353,26 @@ function calcularAlertas() {
 }
 
 let _alertasCache = [];
+let _alertasVistas = new Set(JSON.parse(localStorage.getItem('alertasVistas')||'[]'));
+
+function guardarVistas() {
+  try { localStorage.setItem('alertasVistas', JSON.stringify([..._alertasVistas])); } catch(e){}
+}
 
 function updateAlertasBadge() {
   _alertasCache = calcularAlertas();
   const badge = document.getElementById('alertas-badge');
   if (!badge) return;
-  const n = _alertasCache.length;
+  // Solo contar las no vistas
+  const noVistas = _alertasCache.filter(a=>!_alertasVistas.has(a.alertaId));
+  const n = noVistas.length;
   if (n > 0) { badge.textContent = n>9?'9+':n; badge.style.display='flex'; }
   else badge.style.display='none';
+  // Limpiar vistas que ya no existen (cheques pagados, etc.)
+  const idsActuales = new Set(_alertasCache.map(a=>a.alertaId));
+  _alertasVistas.forEach(id=>{ if(!idsActuales.has(id)) _alertasVistas.delete(id); });
+  // Disparar notificaciones push para las nuevas no vistas
+  notificarNuevasAlertas(noVistas);
 }
 
 function toggleAlertas() {
@@ -2378,6 +2381,11 @@ function toggleAlertas() {
   if (panel.style.display === 'block') { panel.style.display='none'; return; }
   renderAlertasPanel();
   panel.style.display = 'block';
+  // Marcar todas como vistas → el contador baja a 0
+  _alertasCache.forEach(a=>_alertasVistas.add(a.alertaId));
+  guardarVistas();
+  const badge = document.getElementById('alertas-badge');
+  if (badge) badge.style.display='none';
 }
 
 function renderAlertasPanel() {
@@ -2398,6 +2406,37 @@ function renderAlertasPanel() {
 function ejecutarAlerta(idx) {
   const a = _alertasCache[idx];
   if (a && a.accion) { document.getElementById('alertas-panel').style.display='none'; a.accion(); }
+}
+
+// ── Notificaciones push del navegador ──
+let _notifsEnviadas = new Set(JSON.parse(localStorage.getItem('notifsEnviadas')||'[]'));
+
+function pedirPermisoNotif() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function notificarNuevasAlertas(noVistas) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const hoy = today();
+  noVistas.forEach(a=>{
+    // Notificar una vez por día por alerta
+    const key = a.alertaId + '-' + hoy;
+    if (_notifsEnviadas.has(key)) return;
+    _notifsEnviadas.add(key);
+    try {
+      new Notification('GestiónPro — '+a.titulo, {
+        body: a.detalle,
+        icon: 'icon-192.png',
+        tag: a.alertaId,
+      });
+    } catch(e){}
+  });
+  // Limpiar notificaciones viejas (de días anteriores)
+  _notifsEnviadas = new Set([..._notifsEnviadas].filter(k=>k.endsWith(hoy)));
+  try { localStorage.setItem('notifsEnviadas', JSON.stringify([..._notifsEnviadas])); } catch(e){}
 }
 
 function updateTopbar() {
@@ -5291,12 +5330,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
   initFlujoMes();
   document.getElementById('filter-fecha-caja').value = today();
   loadFromFirebase();
+  // Pedir permiso de notificaciones (una sola vez)
+  setTimeout(()=>{ if(typeof pedirPermisoNotif==='function') pedirPermisoNotif(); }, 3000);
 });
 
 // Exponer todas las funciones al scope global (requerido por type="module")
 Object.assign(window, {
   navigate, openModal, closeModal, handleMenuToggle, toggleSidebar,
-  toggleAlertas, ejecutarAlerta, updateAlertasBadge,
+  toggleAlertas, ejecutarAlerta, updateAlertasBadge, pedirPermisoNotif,
   undoLastAction,
   openMobileMenu, closeMobileMenu, toggleFlujoResultado, toggleSemFlujo, getOpenSections, restoreOpenSections,
   filterMovs, filterCheques, filterCajas: ()=>renderCajas(),
