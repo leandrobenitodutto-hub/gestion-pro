@@ -1605,7 +1605,7 @@
         </div>
         <div class="form-group">
           <label>Depósito en Efectivo</label>
-          <input type="number" id="caj-deposito" placeholder="0.00" min="0" step="0.01" oninput="cajRecalc()">
+          <input type="number" id="caj-deposito" placeholder="0.00" min="0" step="0.01" oninput="cajRecalc();cajCheckDepositos()">
           <div style="font-size:11px;color:var(--text3);margin-top:3px">Resta del efectivo de caja</div>
         </div>
         <div class="form-group">
@@ -1621,6 +1621,17 @@
         <div id="caj-gastos-lista"></div>
         <button type="button" class="btn btn-secondary" style="width:100%;margin-top:6px;font-size:12px" onclick="cajAgregarGasto()">
           + Agregar gasto
+        </button>
+      </div>
+
+      <div id="caj-depositos-wrap" style="display:none;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600;color:var(--text2)">Desglose de depósitos en efectivo</div>
+          <div style="font-size:11px" id="caj-depositos-status"></div>
+        </div>
+        <div id="caj-depositos-lista"></div>
+        <button type="button" class="btn btn-secondary" style="width:100%;margin-top:6px;font-size:12px" onclick="cajAgregarDeposito()">
+          + Agregar depósito
         </button>
       </div>
 
@@ -4649,10 +4660,15 @@ function openModal(id) {
   if (dateFields[id]) document.getElementById(dateFields[id]).value = today();
   if (id === 'modal-caja') {
     _cajGastos = [];
+    _cajDepositos = [];
     const wrap = document.getElementById('caj-gastos-wrap');
     if (wrap) wrap.style.display = 'none';
+    const wrapDep = document.getElementById('caj-depositos-wrap');
+    if (wrapDep) wrapDep.style.display = 'none';
     const lista = document.getElementById('caj-gastos-lista');
     if (lista) lista.innerHTML = '';
+    const listaDep = document.getElementById('caj-depositos-lista');
+    if (listaDep) listaDep.innerHTML = '';
     ['caj-sistema','caj-banco','caj-gastos-ef','caj-parcial','caj-efectivo','caj-deposito','caj-notas'].forEach(fid=>{
       const el=document.getElementById(fid); if(el) el.value='';
     });
@@ -5185,10 +5201,97 @@ function cajGastoChange(id, field, value) {
   const g = _cajGastos.find(function(x){return x.id===id;});
   if (g) {
     g[field] = value;
-    if (field === 'monto') cajRenderGastos(); // solo re-render status
-    else { /* no re-render completo para no perder foco */ cajUpdateStatus(); }
+    if (field === 'monto') cajRenderGastos();
+    else { cajUpdateStatus(); }
   }
 }
+
+// ── Depósitos en efectivo (desglose) ──
+let _cajDepositos = [];
+
+function cajCheckDepositos() {
+  const total = parseFloat(document.getElementById('caj-deposito')?.value||0);
+  const wrap  = document.getElementById('caj-depositos-wrap');
+  if (!wrap) return;
+  if (total <= 0) {
+    wrap.style.display = 'none';
+    _cajDepositos = [];
+    cajRenderDepositos();
+    return;
+  }
+  wrap.style.display = 'block';
+  if (_cajDepositos.length === 0) {
+    _cajDepositos.push({ id: uid(), provId: '', desc: '', monto: 0 });
+    cajRenderDepositos();
+  }
+  cajUpdateStatusDepositos();
+}
+
+function cajAgregarDeposito() {
+  _cajDepositos.push({ id: uid(), provId: '', desc: '', monto: 0 });
+  cajRenderDepositos();
+}
+
+function cajEliminarDeposito(id) {
+  _cajDepositos = _cajDepositos.filter(function(d){ return d.id !== id; });
+  cajRenderDepositos();
+  cajUpdateStatusDepositos();
+}
+
+function cajSetMontoDeposito(id, val) {
+  var d = _cajDepositos.find(function(x){return x.id===id;});
+  if (d) { d.monto = parseFloat((val+'').replace(/[^0-9.]/g,''))||0; cajUpdateStatusDepositos(); }
+}
+
+function cajSetDescDeposito(id, val) {
+  var d = _cajDepositos.find(function(x){return x.id===id;});
+  if (d) d.desc = val;
+}
+
+function cajUpdateStatusDepositos() {
+  const status = document.getElementById('caj-depositos-status');
+  const total  = parseFloat(document.getElementById('caj-deposito')?.value||0);
+  const cargado = _cajDepositos.reduce(function(a,d){return a+parseFloat(d.monto||0);},0);
+  const diff = total - cargado;
+  const completo = Math.abs(diff) < 1;
+  if (status) {
+    if (completo) status.innerHTML = '<span style="color:var(--green);font-weight:700">✓ Completo</span>';
+    else if (diff > 0) status.innerHTML = '<span style="color:var(--orange)">Faltan: <strong>'+fmt(diff)+'</strong></span>';
+    else status.innerHTML = '<span style="color:var(--red)">Excede: <strong>'+fmt(-diff)+'</strong></span>';
+  }
+}
+
+function cajRenderDepositos() {
+  const lista = document.getElementById('caj-depositos-lista');
+  if (!lista) return;
+  if (_cajDepositos.length === 0) { lista.innerHTML = ''; return; }
+  const provOpts = '<option value="">— Proveedor (opcional) —</option>' +
+    [...state.proveedores].sort(function(a,b){return a.nombre.localeCompare(b.nombre,'es');})
+      .map(function(p){return '<option value="'+p.id+'">'+p.nombre+'</option>';}).join('');
+  lista.innerHTML = _cajDepositos.map(function(d){
+    return '<div style="display:grid;grid-template-columns:1fr 100px 36px;gap:6px;margin-bottom:8px;align-items:start" id="caj-dep-row-'+d.id+'">'+
+      '<div style="display:grid;gap:4px">'+
+        '<select style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px" '+
+          'onchange="cajDepChange(\''+d.id+'\',\'provId\',this.value)">'+provOpts+'</select>'+
+        '<input type="text" placeholder="Descripción (ej: depósito banco)" value="'+escHtml(d.desc||'')+'" '+
+          'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;width:100%;box-sizing:border-box" '+
+          'oninput="cajSetDescDeposito(\''+d.id+'\',this.value)">'+
+      '</div>'+
+      '<input type="text" inputmode="numeric" placeholder="Monto" value="'+(d.monto||'')+'" '+
+        'style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:13px;font-family:monospace;width:100%;box-sizing:border-box" '+
+        'onchange="cajSetMontoDeposito(\''+d.id+'\',this.value)" oninput="cajSetMontoDeposito(\''+d.id+'\',this.value)">'+
+      '<button type="button" onclick="cajEliminarDeposito(\''+d.id+'\')" '+
+        'style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--red);cursor:pointer;padding:4px 8px;font-size:14px;margin-top:2px">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+function cajDepChange(id, field, value) {
+  var d = _cajDepositos.find(function(x){return x.id===id;});
+  if (d) d[field] = value;
+}
+
+
 
 function cajSetMonto(id, val) {
   var g = _cajGastos.find(function(x){return x.id===id;});
@@ -5280,22 +5383,41 @@ function saveCaja() {
     });
   }
 
-  // Auto-generar ingreso en efectivo del depósito de caja
-  // Primero limpiar ingreso anterior de esta caja (si se está editando)
+  // Auto-generar ingresos en efectivo del desglose de depósitos
   state.ingresos = state.ingresos.filter(function(i){ return i._cajaDepositoId !== cajaId; });
   if (deposito > 0) {
     const locNombre = (state.locales.find(function(l){return l.id===localId;})||{}).nombre || 'local';
-    state.ingresos.push({
-      id: uid(),
-      fecha: fecha,
-      monto: deposito,
-      pago: 'efectivo',
-      cat: 'Depósito de Caja',
-      subcat: '',
-      localId: localId,
-      desc: 'Depósito en efectivo — '+locNombre,
-      _cajaDepositoId: cajaId,
-    });
+    if (_cajDepositos.length > 0) {
+      _cajDepositos.forEach(function(d) {
+        if (!d.monto || d.monto <= 0) return;
+        const prov = state.proveedores.find(function(p){return p.id===d.provId;});
+        state.ingresos.push({
+          id: uid(),
+          fecha: fecha,
+          monto: d.monto,
+          pago: 'efectivo',
+          cat: 'Depósito de Caja',
+          subcat: '',
+          provId: d.provId || null,
+          localId: localId,
+          desc: d.desc || (prov ? prov.nombre : 'Depósito en efectivo — '+locNombre),
+          _cajaDepositoId: cajaId,
+        });
+      });
+    } else {
+      // Sin desglose — generar uno solo con el total
+      state.ingresos.push({
+        id: uid(),
+        fecha: fecha,
+        monto: deposito,
+        pago: 'efectivo',
+        cat: 'Depósito de Caja',
+        subcat: '',
+        localId: localId,
+        desc: 'Depósito en efectivo — '+locNombre,
+        _cajaDepositoId: cajaId,
+      });
+    }
   }
 
   save(); closeModal('modal-caja'); renderCajas(); updateTopbar();
@@ -5303,6 +5425,7 @@ function saveCaja() {
     const el=document.getElementById(id); if(el) el.value='';
   });
   _cajGastos = [];
+  _cajDepositos = [];
   cajRecalc();
 }
 
@@ -5448,7 +5571,8 @@ Object.assign(window, {
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv, agregarProvRapido,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
   autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleRecordatorioDias, toggleInstancias, setInstFilter, setInstFreq,
-  cajRecalc, cajCheckGastos, cajAgregarGasto, cajEliminarGasto, cajGastoChange, cajSetMonto, cajSetDesc, renderFlujo, abrirAjusteObl, guardarAjusteObl,
+  cajRecalc, cajCheckGastos, cajAgregarGasto, cajEliminarGasto, cajGastoChange, cajSetMonto, cajSetDesc,
+  cajCheckDepositos, cajAgregarDeposito, cajEliminarDeposito, cajSetMontoDeposito, cajSetDescDeposito, cajDepChange, renderFlujo, abrirAjusteObl, guardarAjusteObl,
   marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
 });
 </script>
