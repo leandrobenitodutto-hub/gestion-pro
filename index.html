@@ -2861,20 +2861,29 @@ function renderTransferencias() {
 
 function saveTransferencia() {
   const editId = document.getElementById('trans-id').value;
-  const data = {
-    fecha:   document.getElementById('trans-fecha').value,
-    tipo:    document.getElementById('trans-tipo').value,
-    monto:   document.getElementById('trans-monto').value,
-    localId: document.getElementById('trans-local').value||null,
-    desc:    document.getElementById('trans-desc').value,
-  };
-  if (!data.fecha||!data.monto) return alert('Completá fecha y monto');
+  const fecha  = document.getElementById('trans-fecha').value;
+  const tipo   = document.getElementById('trans-tipo').value;
+  const monto  = parseFloat(document.getElementById('trans-monto').value||0);
+  const localId= document.getElementById('trans-local')?.value||null;
+  const desc   = document.getElementById('trans-desc').value;
+
+  if (!fecha)   return alert('Completá la fecha');
+  if (!monto || monto <= 0) return alert('Ingresá un monto válido');
+
+  const data = { fecha, tipo, monto, localId, desc };
+
   if (editId) {
-    const o=state.transferencias.find(x=>x.id===editId); if(o) Object.assign(o,data);
+    const o = state.transferencias.find(x=>x.id===editId);
+    if (o) Object.assign(o, data);
   } else {
-    state.transferencias.push({id:uid(),...data});
+    state.transferencias.push({ id: uid(), ...data });
   }
-  save(); closeModal('modal-transferencia'); renderTransferencias(); updateTopbar();
+
+  save();
+  closeModal('modal-transferencia');
+  renderTransferencias();
+  updateTopbar();
+  showToast('✓ Transferencia guardada');
 }
 
 function editarTransferencia(id) {
@@ -5989,6 +5998,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
   loadFromFirebase();
   // Pedir permiso de notificaciones (una sola vez)
   setTimeout(()=>{ if(typeof pedirPermisoNotif==='function') pedirPermisoNotif(); }, 3000);
+  // Manejar parámetros de URL para accesos directos
+  const params = new URLSearchParams(window.location.search);
+  const accion = params.get('accion');
+  if (accion) {
+    setTimeout(()=>{
+      if (accion === 'nuevo-gasto')    { navigate('gastos');   openModal('modal-gasto'); }
+      if (accion === 'nuevo-ingreso')  { navigate('ingresos'); openModal('modal-ingreso'); }
+      if (accion === 'nueva-caja')     { navigate('cajas');    openModal('modal-caja'); }
+      if (accion === 'nuevo-cheque')   { navigate('cheques');  openModal('modal-cheque'); }
+    }, 1800); // esperar que cargue Firebase
+  }
 });
 
 // Exponer todas las funciones al scope global (requerido por type="module")
