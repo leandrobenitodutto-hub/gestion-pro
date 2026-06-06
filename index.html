@@ -2195,7 +2195,7 @@ function save(skipSnapshot) {
       console.error('Error guardando:', e);
       showToast('⚠ Error al guardar. Verificá tu conexión.');
     }
-  }, 800);
+  }, 0);
 }
 
 function showLoadingOverlay(show) {
@@ -2879,11 +2879,21 @@ function saveTransferencia() {
     state.transferencias.push({ id: uid(), ...data });
   }
 
-  save();
+  // Guardar inmediatamente sin debounce
+  snapshotForUndo();
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    try {
+      await setDoc(DOC_REF, state);
+      showToast('✓ Transferencia guardada');
+    } catch(e) {
+      showToast('⚠ Error al guardar. Verificá tu conexión.');
+    }
+  }, 0);
+
   closeModal('modal-transferencia');
   renderTransferencias();
   updateTopbar();
-  showToast('✓ Transferencia guardada');
 }
 
 function editarTransferencia(id) {
