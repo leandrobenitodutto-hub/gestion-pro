@@ -5243,7 +5243,34 @@ function editarCaja(id) {
   document.getElementById('caj-efectivo').value     = c.efectivo||'';
   document.getElementById('caj-deposito').value     = c.deposito||'';
   document.getElementById('caj-notas').value        = c.notas||'';
+
+  // Reconstruir desglose de gastos desde los gastos con _cajaId
+  _cajGastos = state.gastos
+    .filter(function(g){ return g._cajaId === id; })
+    .map(function(g){
+      return { id: g.id, provId: g.provId||'', localId: g.localId||'', desc: g.desc||'', monto: parseFloat(g.monto||0) };
+    });
+
+  // Reconstruir desglose de depósitos desde los ingresos con _cajaDepositoId
+  _cajDepositos = state.ingresos
+    .filter(function(i){ return i._cajaDepositoId === id; })
+    .map(function(i){
+      return { id: i.id, cliId: i.cliId||'', desc: i.desc||'', monto: parseFloat(i.monto||0) };
+    });
+
+  // Mostrar los wraps si hay datos
+  const wrapGas = document.getElementById('caj-gastos-wrap');
+  if (wrapGas) wrapGas.style.display = _cajGastos.length > 0 ? 'block' : 'none';
+  cajRenderGastos();
+
+  const wrapDep = document.getElementById('caj-depositos-wrap');
+  if (wrapDep) wrapDep.style.display = _cajDepositos.length > 0 ? 'block' : 'none';
+  cajRenderDepositos();
+
   cajRecalc();
+  cajUpdateStatus();
+  cajUpdateStatusDepositos();
+
   document.getElementById('modal-caja').style.display='flex';
 }
 
@@ -5827,13 +5854,17 @@ function saveCaja() {
     state.cajas.push({id:cajaId,...data});
   }
 
+  // Eliminar gastos y depósitos anteriores de esta caja (evitar duplicados al editar)
+  state.gastos = state.gastos.filter(function(g){ return g._cajaId !== cajaId; });
+  state.ingresos = state.ingresos.filter(function(i){ return i._cajaDepositoId !== cajaId; });
+
   // Guardar gastos del desglose como gastos reales
   if (_cajGastos.length > 0) {
     _cajGastos.forEach(function(g) {
       if (!g.monto || g.monto <= 0) return;
       const prov = state.proveedores.find(function(p){return p.id===g.provId;});
       state.gastos.push({
-        id: uid(),
+        id: g.id || uid(),
         fecha: fecha,
         monto: g.monto,
         pago: 'efectivo',
@@ -5848,7 +5879,6 @@ function saveCaja() {
   }
 
   // Auto-generar ingresos en efectivo del desglose de depósitos
-  state.ingresos = state.ingresos.filter(function(i){ return i._cajaDepositoId !== cajaId; });
   if (deposito > 0) {
     const locNombre = (state.locales.find(function(l){return l.id===localId;})||{}).nombre || 'local';
     if (_cajDepositos.length > 0) {
