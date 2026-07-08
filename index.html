@@ -3993,15 +3993,17 @@ function renderFlujo() {
     title.style.cssText = 'font-weight:700;font-size:14px';
     title.textContent = s.label;
 
+    const pendMonto = instSemFilt.filter(i=>i.estado==='pendiente').reduce(function(a,b){return a+parseFloat(b.monto||0);},0);
     const subtitle = document.createElement('div');
     subtitle.style.cssText = 'font-size:12px;color:var(--text2);margin-top:2px';
-    subtitle.innerHTML = ingLabel +
-      ' <span style="color:var(--border)">|</span> ' +
-      '<span style="color:var(--red)">↓ '+fmt(s.semPasada ? s.gasPag : totalGastos)+'</span>' +
-      ' <span style="color:var(--border)">|</span> ' +
-      '<span style="color:'+(res2>=0?'var(--green)':'var(--red)')+';font-weight:700">'+(res2>=0?'+':'')+fmt(res2)+'</span>' +
-      (pendCount > 0 ? ' <span style="color:var(--orange)">⚠ '+pendCount+' pendientes</span>' :
-        instSemFilt.length > 0 ? ' <span style="color:var(--green)">✓ Todo pagado</span>' : '');
+    if (pendCount > 0) {
+      subtitle.innerHTML = '<span style="color:var(--red);font-weight:700;font-size:13px">↓ Pendiente: '+fmt(pendMonto)+'</span>' +
+        ' <span style="font-size:11px;color:var(--text3)">('+pendCount+' obligaciones)</span>';
+    } else if (instSemFilt.length > 0) {
+      subtitle.innerHTML = '<span style="color:var(--green);font-weight:700">✓ Todo pagado</span>';
+    } else {
+      subtitle.innerHTML = '<span style="color:var(--text3);font-size:11px">Sin obligaciones</span>';
+    }
 
     headerLeft.appendChild(title);
     headerLeft.appendChild(subtitle);
