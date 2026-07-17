@@ -1347,7 +1347,6 @@
         </div>
       </div>
 
-
       <!-- =================== CATEGORÍAS =================== -->
       <div class="page" id="page-categorias">
         <div class="section-header">
@@ -1709,6 +1708,11 @@
           <input type="checkbox" id="obl-es-socio" onchange="toggleOblSocio()" style="width:auto;margin:0">
           <span>👥 Esta obligación es un retiro de socio</span>
         </label>
+        <div id="obl-socio-wrap" style="display:none;margin-top:10px">
+          <label style="font-size:12px">Socio</label>
+          <select id="obl-socio-id" style="width:auto"></select>
+        </div>
+      </div>
       <div class="form-group full" style="background:var(--surface2);border-radius:8px;padding:12px;margin-top:4px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
           <input type="checkbox" id="obl-recordatorio" onchange="toggleRecordatorioDias()" style="width:auto;margin:0">
