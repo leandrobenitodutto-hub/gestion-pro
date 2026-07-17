@@ -1347,119 +1347,6 @@
         </div>
       </div>
 
-      <!-- MODAL SOCIO -->
-      <div class="modal" id="modal-socio">
-        <div class="modal-content" style="max-width:400px">
-          <div class="modal-header">
-            <h3 id="socio-modal-title">Nuevo Socio</h3>
-            <button class="btn-icon" onclick="closeModal('modal-socio')">✕</button>
-          </div>
-          <input type="hidden" id="socio-id">
-          <div class="form-group">
-            <label>Nombre</label>
-            <input type="text" id="socio-nombre" placeholder="Ej: Leandro">
-          </div>
-          <div class="form-group">
-            <label>Color</label>
-            <input type="color" id="socio-color" value="#f0c040" style="height:40px;width:100%">
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('modal-socio')">Cancelar</button>
-            <button class="btn btn-primary" onclick="saveSocio()">Guardar</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- MODAL MOVIMIENTO SOCIO -->
-      <div class="modal" id="modal-mov-socio">
-        <div class="modal-content" style="max-width:460px">
-          <div class="modal-header">
-            <h3 id="mov-socio-modal-title">Nuevo Movimiento</h3>
-            <button class="btn-icon" onclick="closeModal('modal-mov-socio')">✕</button>
-          </div>
-          <input type="hidden" id="mov-socio-id">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div class="form-group">
-              <label>Fecha</label>
-              <input type="date" id="mov-socio-fecha">
-            </div>
-            <div class="form-group">
-              <label>Socio</label>
-              <select id="mov-socio-socio"></select>
-            </div>
-            <div class="form-group">
-              <label>Tipo</label>
-              <select id="mov-socio-tipo" onchange="toggleMovSocioTipo()">
-                <option value="credito">✅ Crédito (empresa debe al socio)</option>
-                <option value="debito">💸 Débito (socio retira/devuelve)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Concepto</label>
-              <select id="mov-socio-concepto">
-                <option value="retiro_mensual">Retiro mensual</option>
-                <option value="comision_ubika">Comisión UBIKA</option>
-                <option value="evento">Evento extraordinario</option>
-                <option value="adelanto">Adelanto empresa</option>
-                <option value="retiro">Retiro del socio</option>
-                <option value="devolucion">Devolución socio</option>
-                <option value="otro">Otro</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Monto</label>
-              <input type="number" id="mov-socio-monto" placeholder="0.00" min="0">
-            </div>
-            <div class="form-group" id="mov-socio-pago-wrap">
-              <label>Forma de pago</label>
-              <select id="mov-socio-pago">
-                <option value="efectivo">💵 Efectivo</option>
-                <option value="banco">🏦 Banco</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Descripción</label>
-            <input type="text" id="mov-socio-desc" placeholder="Detalle del movimiento...">
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('modal-mov-socio')">Cancelar</button>
-            <button class="btn btn-primary" onclick="saveMovSocio()">Guardar</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- MODAL RETIRO PARCIAL -->
-      <div class="modal" id="modal-retiro-socio">
-        <div class="modal-content" style="max-width:400px">
-          <div class="modal-header">
-            <h3>Registrar Retiro</h3>
-            <button class="btn-icon" onclick="closeModal('modal-retiro-socio')">✕</button>
-          </div>
-          <input type="hidden" id="retiro-socio-id">
-          <div id="retiro-socio-info" style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px"></div>
-          <div class="form-group">
-            <label>Fecha del retiro</label>
-            <input type="date" id="retiro-socio-fecha">
-          </div>
-          <div class="form-group">
-            <label>Monto a retirar</label>
-            <input type="number" id="retiro-socio-monto" placeholder="0.00" min="0">
-            <div style="font-size:11px;color:var(--text3);margin-top:4px">Puede ser parcial</div>
-          </div>
-          <div class="form-group">
-            <label>Forma de pago</label>
-            <select id="retiro-socio-pago">
-              <option value="efectivo">💵 Efectivo</option>
-              <option value="banco">🏦 Banco</option>
-            </select>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('modal-retiro-socio')">Cancelar</button>
-            <button class="btn btn-primary" onclick="confirmarRetiroSocio()">Confirmar Retiro</button>
-          </div>
-        </div>
-      </div>
 
       <!-- =================== CATEGORÍAS =================== -->
       <div class="page" id="page-categorias">
@@ -1965,6 +1852,121 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-caja')">Cancelar</button>
       <button class="btn btn-primary" onclick="saveCaja()">Guardar Caja</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL SOCIO -->
+<div class="modal-overlay" id="modal-socio" style="display:none">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h3 id="socio-modal-title">Nuevo Socio</h3>
+      <button class="btn-icon" onclick="closeModal('modal-socio')">✕</button>
+    </div>
+    <input type="hidden" id="socio-id">
+    <div class="form-group">
+      <label>Nombre</label>
+      <input type="text" id="socio-nombre" placeholder="Ej: Leandro">
+    </div>
+    <div class="form-group">
+      <label>Color</label>
+      <input type="color" id="socio-color" value="#f0c040" style="height:40px;width:100%">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-socio')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSocio()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MOVIMIENTO SOCIO -->
+<div class="modal-overlay" id="modal-mov-socio" style="display:none">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h3 id="mov-socio-modal-title">Nuevo Movimiento</h3>
+      <button class="btn-icon" onclick="closeModal('modal-mov-socio')">✕</button>
+    </div>
+    <input type="hidden" id="mov-socio-id">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="mov-socio-fecha">
+      </div>
+      <div class="form-group">
+        <label>Socio</label>
+        <select id="mov-socio-socio"></select>
+      </div>
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="mov-socio-tipo" onchange="toggleMovSocioTipo()">
+          <option value="credito">✅ Crédito (empresa debe al socio)</option>
+          <option value="debito">💸 Débito (socio retira/devuelve)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Concepto</label>
+        <select id="mov-socio-concepto">
+          <option value="retiro_mensual">Retiro mensual</option>
+          <option value="comision_ubika">Comisión UBIKA</option>
+          <option value="evento">Evento extraordinario</option>
+          <option value="adelanto">Adelanto empresa</option>
+          <option value="retiro">Retiro del socio</option>
+          <option value="devolucion">Devolución socio</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Monto</label>
+        <input type="number" id="mov-socio-monto" placeholder="0.00" min="0">
+      </div>
+      <div class="form-group" id="mov-socio-pago-wrap">
+        <label>Forma de pago</label>
+        <select id="mov-socio-pago">
+          <option value="efectivo">💵 Efectivo</option>
+          <option value="banco">🏦 Banco</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Descripción</label>
+      <input type="text" id="mov-socio-desc" placeholder="Detalle del movimiento...">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-mov-socio')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveMovSocio()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RETIRO PARCIAL -->
+<div class="modal-overlay" id="modal-retiro-socio" style="display:none">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h3>Registrar Retiro</h3>
+      <button class="btn-icon" onclick="closeModal('modal-retiro-socio')">✕</button>
+    </div>
+    <input type="hidden" id="retiro-socio-id">
+    <div id="retiro-socio-info" style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px"></div>
+    <div class="form-group">
+      <label>Fecha del retiro</label>
+      <input type="date" id="retiro-socio-fecha">
+    </div>
+    <div class="form-group">
+      <label>Monto a retirar</label>
+      <input type="number" id="retiro-socio-monto" placeholder="0.00" min="0">
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">Puede ser parcial</div>
+    </div>
+    <div class="form-group">
+      <label>Forma de pago</label>
+      <select id="retiro-socio-pago">
+        <option value="efectivo">💵 Efectivo</option>
+        <option value="banco">🏦 Banco</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-retiro-socio')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarRetiroSocio()">Confirmar Retiro</button>
     </div>
   </div>
 </div>
