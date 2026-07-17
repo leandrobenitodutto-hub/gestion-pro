@@ -422,6 +422,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
         <span class="nav-text">Mis Locales</span>
       </div>
+      <div class="nav-item" onclick="navigate('socios');closeMobileMenu()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="nav-text">Cuenta Socios</span>
+      </div>
       <div class="nav-item" onclick="navigate('categorias');closeMobileMenu()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
         <span class="nav-text">Categorías</span>
@@ -1282,6 +1286,181 @@
         </div>
       </div>
 
+      <!-- =================== CUENTA SOCIOS =================== -->
+      <div class="page" id="page-socios">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Cuenta Corriente Socios</div>
+            <div class="section-sub">Créditos, débitos y retiros por socio</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary" onclick="openModal('modal-socio')">+ Socio</button>
+            <button class="btn btn-primary" onclick="openModal('modal-mov-socio')">+ Movimiento</button>
+          </div>
+        </div>
+
+        <!-- Tarjetas resumen por socio -->
+        <div id="socios-cards" class="grid-4" style="gap:12px;margin-bottom:20px"></div>
+
+        <!-- Filtros -->
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <select id="filter-socio" onchange="renderSocios()" style="width:auto">
+              <option value="">— Todos los socios —</option>
+            </select>
+            <select id="filter-concepto-socio" onchange="renderSocios()" style="width:auto">
+              <option value="">— Todos los conceptos —</option>
+              <option value="retiro_mensual">Retiro mensual</option>
+              <option value="comision_ubika">Comisión UBIKA</option>
+              <option value="evento">Evento extraordinario</option>
+              <option value="adelanto">Adelanto empresa</option>
+              <option value="retiro">Retiro del socio</option>
+              <option value="devolucion">Devolución socio</option>
+              <option value="otro">Otro</option>
+            </select>
+            <input type="month" id="filter-mes-socio" onchange="renderSocios()" style="width:auto">
+            <input type="text" id="filter-texto-socio" placeholder="🔍 Buscar..." oninput="renderSocios()"
+              style="flex:1;min-width:160px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 12px;font-size:13px">
+          </div>
+        </div>
+
+        <!-- Tabla movimientos -->
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Socio</th>
+                  <th>Concepto</th>
+                  <th class="hide-mobile">Descripción</th>
+                  <th class="hide-mobile">F.Pago</th>
+                  <th class="mono" style="color:var(--green)">Crédito</th>
+                  <th class="mono" style="color:var(--red)">Débito</th>
+                  <th>Estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="tabla-socios"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL SOCIO -->
+      <div class="modal" id="modal-socio">
+        <div class="modal-content" style="max-width:400px">
+          <div class="modal-header">
+            <h3 id="socio-modal-title">Nuevo Socio</h3>
+            <button class="btn-icon" onclick="closeModal('modal-socio')">✕</button>
+          </div>
+          <input type="hidden" id="socio-id">
+          <div class="form-group">
+            <label>Nombre</label>
+            <input type="text" id="socio-nombre" placeholder="Ej: Leandro">
+          </div>
+          <div class="form-group">
+            <label>Color</label>
+            <input type="color" id="socio-color" value="#f0c040" style="height:40px;width:100%">
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-socio')">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveSocio()">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL MOVIMIENTO SOCIO -->
+      <div class="modal" id="modal-mov-socio">
+        <div class="modal-content" style="max-width:460px">
+          <div class="modal-header">
+            <h3 id="mov-socio-modal-title">Nuevo Movimiento</h3>
+            <button class="btn-icon" onclick="closeModal('modal-mov-socio')">✕</button>
+          </div>
+          <input type="hidden" id="mov-socio-id">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label>Fecha</label>
+              <input type="date" id="mov-socio-fecha">
+            </div>
+            <div class="form-group">
+              <label>Socio</label>
+              <select id="mov-socio-socio"></select>
+            </div>
+            <div class="form-group">
+              <label>Tipo</label>
+              <select id="mov-socio-tipo" onchange="toggleMovSocioTipo()">
+                <option value="credito">✅ Crédito (empresa debe al socio)</option>
+                <option value="debito">💸 Débito (socio retira/devuelve)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Concepto</label>
+              <select id="mov-socio-concepto">
+                <option value="retiro_mensual">Retiro mensual</option>
+                <option value="comision_ubika">Comisión UBIKA</option>
+                <option value="evento">Evento extraordinario</option>
+                <option value="adelanto">Adelanto empresa</option>
+                <option value="retiro">Retiro del socio</option>
+                <option value="devolucion">Devolución socio</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Monto</label>
+              <input type="number" id="mov-socio-monto" placeholder="0.00" min="0">
+            </div>
+            <div class="form-group" id="mov-socio-pago-wrap">
+              <label>Forma de pago</label>
+              <select id="mov-socio-pago">
+                <option value="efectivo">💵 Efectivo</option>
+                <option value="banco">🏦 Banco</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Descripción</label>
+            <input type="text" id="mov-socio-desc" placeholder="Detalle del movimiento...">
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-mov-socio')">Cancelar</button>
+            <button class="btn btn-primary" onclick="saveMovSocio()">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL RETIRO PARCIAL -->
+      <div class="modal" id="modal-retiro-socio">
+        <div class="modal-content" style="max-width:400px">
+          <div class="modal-header">
+            <h3>Registrar Retiro</h3>
+            <button class="btn-icon" onclick="closeModal('modal-retiro-socio')">✕</button>
+          </div>
+          <input type="hidden" id="retiro-socio-id">
+          <div id="retiro-socio-info" style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px"></div>
+          <div class="form-group">
+            <label>Fecha del retiro</label>
+            <input type="date" id="retiro-socio-fecha">
+          </div>
+          <div class="form-group">
+            <label>Monto a retirar</label>
+            <input type="number" id="retiro-socio-monto" placeholder="0.00" min="0">
+            <div style="font-size:11px;color:var(--text3);margin-top:4px">Puede ser parcial</div>
+          </div>
+          <div class="form-group">
+            <label>Forma de pago</label>
+            <select id="retiro-socio-pago">
+              <option value="efectivo">💵 Efectivo</option>
+              <option value="banco">🏦 Banco</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-retiro-socio')">Cancelar</button>
+            <button class="btn btn-primary" onclick="confirmarRetiroSocio()">Confirmar Retiro</button>
+          </div>
+        </div>
+      </div>
+
       <!-- =================== CATEGORÍAS =================== -->
       <div class="page" id="page-categorias">
         <div class="section-header">
@@ -1638,6 +1817,11 @@
         <label>Local</label>
         <select id="obl-local"></select>
       </div>
+      <div class="form-group full" style="background:var(--surface2);border-radius:8px;padding:12px;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+          <input type="checkbox" id="obl-es-socio" onchange="toggleOblSocio()" style="width:auto;margin:0">
+          <span>👥 Esta obligación es un retiro de socio</span>
+        </label>
       <div class="form-group full" style="background:var(--surface2);border-radius:8px;padding:12px;margin-top:4px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
           <input type="checkbox" id="obl-recordatorio" onchange="toggleRecordatorioDias()" style="width:auto;margin:0">
@@ -2180,6 +2364,7 @@ function undoLastAction() {
     'page-categorias': renderCategorias,
     'page-analisis': () => initAnalisis(),
     'page-reporte': () => initReporte(),
+    'page-socios': () => initSocios(),
   }[pid] || (()=>{}))();
   updateTopbar();
   showToast('↩ Acción deshecha');
@@ -2232,6 +2417,8 @@ let state = {
   oblAjustes: [],
   transferencias: [],
   oblInstancias: [],
+  socios: [],
+  cuentaSocios: [],
   parametros: { saldoInicialCaja: 0, saldoInicialBanco: 0, fechaApertura: '' },
 };
 
@@ -2382,7 +2569,7 @@ function navigate(page) {
     cheques: 'Cheques', obligaciones: 'Obligaciones', cajas: 'Caja de Locales',
     flujo: 'Flujo de Fondos', proveedores: 'Proveedores', clientes: 'Clientes',
     transferencias: 'Transferencias',
-    locales: 'Mis Locales', categorias: 'Categorías', analisis: 'Análisis', reporte: 'Reporte Mensual'
+    locales: 'Mis Locales', categorias: 'Categorías', analisis: 'Análisis', reporte: 'Reporte Mensual', socios: 'Cuenta Socios'
   };
   document.getElementById('topbar-title').textContent = titles[page] || page;
   updateBottomNav(page);
@@ -3494,6 +3681,11 @@ function confirmarPagoObl() {
     _instId: id,
   });
   inst._gastoId = gastoId;
+  // Si la obligación está vinculada a un socio → generar crédito automático
+  if (obl.socioId) {
+    registrarCreditoSocioDesdeObl(inst, monto, pago, fecha);
+    showToast('✓ Pagado — crédito generado para '+getSocioNombre(obl.socioId));
+  }
   save();
   closeModal('modal-pagar-obl');
   renderObligaciones();
@@ -3666,6 +3858,11 @@ function editarObl(id) {
   document.getElementById('obl-dia').value = o.dia || '';
   if (o.diaSemana != null) document.getElementById('obl-dia-semana').value = o.diaSemana;
   if (o.fechaUnica) document.getElementById('obl-fecha-unica').value = o.fechaUnica;
+  const chkSocio = document.getElementById('obl-es-socio');
+  if (chkSocio) chkSocio.checked = o.esSocio || false;
+  toggleOblSocio();
+  const selSocio = document.getElementById('obl-socio-id');
+  if (selSocio && o.socioId) selSocio.value = o.socioId;
   const chkRec = document.getElementById('obl-recordatorio');
   if (chkRec) chkRec.checked = o.recordatorio || false;
   const recDias = document.getElementById('obl-recordatorio-dias');
@@ -4919,7 +5116,290 @@ function rptExportarExcel() {
   XLSX.writeFile(wb,'Reporte-GestionPro-'+d.mes+'.xlsx');
 }
 
-function renderLocales() {
+// ========================= CUENTA SOCIOS =========================
+const CONCEPTO_LABELS = {
+  retiro_mensual: 'Retiro mensual',
+  comision_ubika: 'Comisión UBIKA',
+  evento: 'Evento extraordinario',
+  adelanto: 'Adelanto empresa',
+  retiro: 'Retiro del socio',
+  devolucion: 'Devolución socio',
+  otro: 'Otro',
+};
+
+function getSocioNombre(id) {
+  const s = state.socios.find(x=>x.id===id);
+  return s ? s.nombre : '-';
+}
+
+function calcSaldoSocio(socioId) {
+  // Saldo = suma créditos - suma débitos
+  return state.cuentaSocios
+    .filter(m=>m.socioId===socioId)
+    .reduce((a,m)=>{
+      const monto = parseFloat(m.monto||0);
+      return a + (m.tipo==='credito' ? monto : -monto);
+    }, 0);
+}
+
+function initSocios() {
+  // Filtro por socio
+  const sel = document.getElementById('filter-socio');
+  if (sel) {
+    sel.innerHTML = '<option value="">— Todos los socios —</option>' +
+      state.socios.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+  }
+  // Mes default
+  const mes = document.getElementById('filter-mes-socio');
+  if (mes && !mes.value) mes.value = thisMonth();
+  renderSocios();
+}
+
+function renderSocios() {
+  // ── Tarjetas resumen ──
+  const cards = document.getElementById('socios-cards');
+  if (cards) {
+    if (!state.socios.length) {
+      cards.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text3)">No hay socios cargados. Agregá el primero con "+ Socio".</div>';
+    } else {
+      cards.innerHTML = state.socios.map(s=>{
+        const saldo = calcSaldoSocio(s.id);
+        const color = saldo >= 0 ? 'var(--red)' : 'var(--green)'; // rojo = empresa debe; verde = socio debe
+        const label = saldo >= 0 ? 'Empresa le debe' : 'Socio debe';
+        return `<div class="stat-card" style="border-left:3px solid ${s.color||'var(--accent)'}">
+          <div class="stat-label">${s.nombre}</div>
+          <div class="stat-value" style="color:${color};font-size:20px">${fmt(Math.abs(saldo))}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">${label}</div>
+          <button class="btn btn-secondary" style="margin-top:8px;font-size:11px;padding:4px 10px" onclick="abrirRetiroSocio('${s.id}')">💸 Registrar retiro</button>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // ── Tabla movimientos ──
+  const socioFil  = document.getElementById('filter-socio')?.value || '';
+  const concFil   = document.getElementById('filter-concepto-socio')?.value || '';
+  const mesFil    = document.getElementById('filter-mes-socio')?.value || '';
+  const textoFil  = (document.getElementById('filter-texto-socio')?.value||'').toLowerCase();
+
+  let movs = [...state.cuentaSocios];
+  if (socioFil)  movs = movs.filter(m=>m.socioId===socioFil);
+  if (concFil)   movs = movs.filter(m=>m.concepto===concFil);
+  if (mesFil)    movs = movs.filter(m=>m.fecha&&m.fecha.startsWith(mesFil));
+  if (textoFil)  movs = movs.filter(m=>(m.desc||'').toLowerCase().includes(textoFil)||
+    getSocioNombre(m.socioId).toLowerCase().includes(textoFil));
+
+  movs.sort((a,b)=>b.fecha>a.fecha?1:-1);
+
+  const tbody = document.getElementById('tabla-socios');
+  if (!tbody) return;
+
+  if (!movs.length) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><div class="empty-icon">👥</div><p>Sin movimientos con esos filtros</p></div></td></tr>';
+    return;
+  }
+
+  const socio = state.socios.find(s=>s.id===socioFil);
+  const color = socio?.color || 'var(--accent)';
+
+  tbody.innerHTML = movs.map(m=>{
+    const s = state.socios.find(x=>x.id===m.socioId)||{nombre:'-',color:'var(--accent)'};
+    const esCred = m.tipo === 'credito';
+    return `<tr>
+      <td style="font-size:12px">${fmtDate(m.fecha)}</td>
+      <td><span style="color:${s.color||'var(--accent)'};font-weight:600">${s.nombre}</span></td>
+      <td><span class="badge badge-gray">${CONCEPTO_LABELS[m.concepto]||m.concepto}</span></td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--text3)">${m.desc||'-'}</td>
+      <td class="hide-mobile">${tagPago(m.pago)}</td>
+      <td class="mono" style="color:var(--green);font-weight:600">${esCred?fmt(m.monto):''}</td>
+      <td class="mono" style="color:var(--red);font-weight:600">${!esCred?fmt(m.monto):''}</td>
+      <td><span class="badge" style="color:${m.estado==='pagado'?'var(--green)':'var(--orange)'}">${m.estado==='pagado'?'Pagado':'Pendiente'}</span></td>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-icon btn-sm" onclick="editarMovSocio('${m.id}')">✏</button>
+        <button class="btn btn-icon btn-sm" onclick="delMovSocio('${m.id}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function saveSocio() {
+  const editId = document.getElementById('socio-id').value;
+  const nombre = document.getElementById('socio-nombre').value.trim();
+  const color  = document.getElementById('socio-color').value;
+  if (!nombre) return alert('Ingresá el nombre del socio');
+  if (editId) {
+    const o = state.socios.find(x=>x.id===editId);
+    if (o) { o.nombre=nombre; o.color=color; }
+  } else {
+    state.socios.push({id:uid(), nombre, color, oblIds:[]});
+  }
+  save(); closeModal('modal-socio'); renderSocios();
+  showToast('✓ Socio guardado');
+}
+
+function editarSocio(id) {
+  const s = state.socios.find(x=>x.id===id);
+  if (!s) return;
+  document.getElementById('socio-id').value    = id;
+  document.getElementById('socio-nombre').value = s.nombre;
+  document.getElementById('socio-color').value  = s.color||'#f0c040';
+  document.getElementById('socio-modal-title').textContent = 'Editar Socio';
+  openModal('modal-socio');
+}
+
+function saveMovSocio() {
+  const editId  = document.getElementById('mov-socio-id').value;
+  const fecha   = document.getElementById('mov-socio-fecha').value;
+  const socioId = document.getElementById('mov-socio-socio').value;
+  const tipo    = document.getElementById('mov-socio-tipo').value;
+  const concepto= document.getElementById('mov-socio-concepto').value;
+  const monto   = parseFloat(document.getElementById('mov-socio-monto').value||0);
+  const pago    = document.getElementById('mov-socio-pago').value;
+  const desc    = document.getElementById('mov-socio-desc').value;
+
+  if (!fecha)   return alert('Ingresá la fecha');
+  if (!socioId) return alert('Seleccioná un socio');
+  if (!monto)   return alert('Ingresá el monto');
+
+  const data = {fecha, socioId, tipo, concepto, monto, pago, desc, estado:'pagado'};
+
+  // Si es débito (retiro/devolución) → genera gasto automático
+  if (tipo === 'debito' && !editId) {
+    const socio = state.socios.find(s=>s.id===socioId);
+    const gastoId = uid();
+    state.gastos.push({
+      id: gastoId,
+      fecha, monto, pago,
+      cat: 'Retiro Socios',
+      subcat: socio?.nombre||'',
+      desc: desc||'Retiro '+( socio?.nombre||'socio'),
+      localId: null,
+    });
+    data._gastoId = gastoId;
+  }
+
+  // Si es crédito (empresa genera deuda) → queda pendiente hasta que el socio retire
+  if (tipo === 'credito') {
+    data.estado = 'pendiente';
+  }
+
+  if (editId) {
+    const o = state.cuentaSocios.find(x=>x.id===editId);
+    if (o) Object.assign(o, data);
+  } else {
+    state.cuentaSocios.push({id:uid(), ...data});
+  }
+
+  save(); closeModal('modal-mov-socio'); renderSocios(); updateTopbar();
+  showToast('✓ Movimiento guardado');
+}
+
+function editarMovSocio(id) {
+  const m = state.cuentaSocios.find(x=>x.id===id);
+  if (!m) return;
+  // Llenar select socios
+  const sel = document.getElementById('mov-socio-socio');
+  sel.innerHTML = state.socios.map(s=>`<option value="${s.id}"${s.id===m.socioId?' selected':''}>${s.nombre}</option>`).join('');
+  document.getElementById('mov-socio-id').value      = id;
+  document.getElementById('mov-socio-fecha').value   = m.fecha||'';
+  document.getElementById('mov-socio-tipo').value    = m.tipo||'credito';
+  document.getElementById('mov-socio-concepto').value= m.concepto||'otro';
+  document.getElementById('mov-socio-monto').value   = m.monto||'';
+  document.getElementById('mov-socio-pago').value    = m.pago||'efectivo';
+  document.getElementById('mov-socio-desc').value    = m.desc||'';
+  document.getElementById('mov-socio-modal-title').textContent = 'Editar Movimiento';
+  toggleMovSocioTipo();
+  openModal('modal-mov-socio');
+}
+
+function delMovSocio(id) {
+  const m = state.cuentaSocios.find(x=>x.id===id);
+  if (!m) return;
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  // Eliminar gasto asociado si existe
+  if (m._gastoId) state.gastos = state.gastos.filter(g=>g.id!==m._gastoId);
+  state.cuentaSocios = state.cuentaSocios.filter(x=>x.id!==id);
+  save(); renderSocios(); updateTopbar();
+  showToast('✓ Movimiento eliminado');
+}
+
+function toggleMovSocioTipo() {
+  const tipo = document.getElementById('mov-socio-tipo')?.value;
+  const wrap = document.getElementById('mov-socio-pago-wrap');
+  // Mostrar forma de pago siempre (crédito puede tener pago también)
+  if (wrap) wrap.style.display = 'block';
+}
+
+function abrirRetiroSocio(socioId) {
+  const socio = state.socios.find(s=>s.id===socioId);
+  if (!socio) return;
+  const saldo = calcSaldoSocio(socioId);
+  const info  = document.getElementById('retiro-socio-info');
+  if (info) info.innerHTML = `<strong>${socio.nombre}</strong><br>
+    Saldo a favor: <span style="color:var(--red);font-weight:700">${fmt(Math.abs(saldo))}</span>
+    ${saldo < 0 ? '<br><span style="color:var(--orange)">⚠ El socio no tiene saldo a favor</span>' : ''}`;
+  document.getElementById('retiro-socio-id').value   = socioId;
+  document.getElementById('retiro-socio-fecha').value = today();
+  document.getElementById('retiro-socio-monto').value = '';
+  openModal('modal-retiro-socio');
+}
+
+function confirmarRetiroSocio() {
+  const socioId = document.getElementById('retiro-socio-id').value;
+  const fecha   = document.getElementById('retiro-socio-fecha').value;
+  const monto   = parseFloat(document.getElementById('retiro-socio-monto').value||0);
+  const pago    = document.getElementById('retiro-socio-pago').value;
+
+  if (!fecha)  return alert('Ingresá la fecha');
+  if (!monto)  return alert('Ingresá el monto a retirar');
+
+  const socio = state.socios.find(s=>s.id===socioId);
+
+  // Crear débito en cuenta del socio
+  const gastoId = uid();
+  state.gastos.push({
+    id: gastoId, fecha, monto, pago,
+    cat: 'Retiro Socios',
+    subcat: socio?.nombre||'',
+    desc: 'Retiro '+(socio?.nombre||'socio'),
+    localId: null,
+  });
+
+  state.cuentaSocios.push({
+    id: uid(), socioId, fecha,
+    tipo: 'debito',
+    concepto: 'retiro',
+    monto, pago,
+    desc: 'Retiro '+(socio?.nombre||'socio'),
+    estado: 'pagado',
+    _gastoId: gastoId,
+  });
+
+  save(); closeModal('modal-retiro-socio'); renderSocios(); updateTopbar();
+  showToast('✓ Retiro registrado — impacta en saldo '+pago);
+}
+
+// Vinculación automática desde obligaciones
+// Cuando se paga una instancia de obligación vinculada a un socio,
+// se genera automáticamente el crédito en la cuenta del socio.
+function registrarCreditoSocioDesdeObl(inst, monto, pago, fecha) {
+  const obl = state.obligaciones.find(o=>o.id===inst.oblId);
+  if (!obl || !obl.socioId) return; // no está vinculada a socio
+  state.cuentaSocios.push({
+    id: uid(),
+    socioId: obl.socioId,
+    fecha: fecha || inst.fechaPago || today(),
+    tipo: 'credito',
+    concepto: 'retiro_mensual',
+    monto: monto || parseFloat(inst.montoPagado||inst.monto||0),
+    pago: pago || inst.pago || 'banco',
+    desc: inst.oblDesc||obl.desc||'Retiro mensual',
+    estado: 'pendiente', // pendiente hasta que el socio retire
+    _oblInstanciaId: inst.id,
+  });
+}
+
+
   // Llenar campos de apertura
   const p = state.parametros || {};
   const fp = document.getElementById('param-fecha-apertura');
@@ -5142,6 +5622,17 @@ function openModal(id) {
     const ph=document.getElementById('obl-proveedor'); if(ph) ph.value='';
     const rec=document.getElementById('obl-recordatorio'); if(rec) rec.checked=false;
     toggleRecordatorioDias();
+    const esSocio=document.getElementById('obl-es-socio'); if(esSocio) esSocio.checked=false;
+    toggleOblSocio();
+  }
+  if (id === 'modal-mov-socio') {
+    document.getElementById('mov-socio-id').value = '';
+    document.getElementById('mov-socio-modal-title').textContent = 'Nuevo Movimiento';
+    document.getElementById('mov-socio-fecha').value = today();
+    document.getElementById('mov-socio-monto').value = '';
+    document.getElementById('mov-socio-desc').value  = '';
+    const sel = document.getElementById('mov-socio-socio');
+    if (sel) sel.innerHTML = state.socios.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
   }
   if (id === 'modal-local') {
     document.getElementById('loc-id').value='';
@@ -5387,6 +5878,17 @@ function fillProvSubcat() {
 }
 
 // Autocompleta categoría y subcategoría al elegir proveedor en gasto
+function toggleOblSocio() {
+  const chk  = document.getElementById('obl-es-socio');
+  const wrap = document.getElementById('obl-socio-wrap');
+  const sel  = document.getElementById('obl-socio-id');
+  if (!wrap) return;
+  wrap.style.display = chk&&chk.checked ? 'block' : 'none';
+  if (sel && chk&&chk.checked) {
+    sel.innerHTML = state.socios.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+  }
+}
+
 function toggleRecordatorioDias() {
   const chk = document.getElementById('obl-recordatorio');
   const wrap = document.getElementById('obl-recordatorio-dias-wrap');
@@ -5578,6 +6080,8 @@ function saveObligacion() {
     provId: document.getElementById('obl-proveedor').value || null,
     recordatorio: document.getElementById('obl-recordatorio')?.checked || false,
     recordatorioDias: parseInt(document.getElementById('obl-recordatorio-dias')?.value || 3),
+    esSocio: document.getElementById('obl-es-socio')?.checked || false,
+    socioId: document.getElementById('obl-es-socio')?.checked ? (document.getElementById('obl-socio-id')?.value||null) : null,
   };
   if (!data.desc || !data.monto) return alert('Completá descripción y monto');
   if (freq==='unica' && !fechaUnica) return alert('Ingresá la fecha de vencimiento');
@@ -6078,7 +6582,8 @@ Object.assign(window, {
   autocompletarDesdeProveedor, autocompletarObligacionDesdeProveedor,
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv, agregarProvRapido,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
-  autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleRecordatorioDias, toggleInstancias, setInstFilter, setInstFreq,
+  autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleRecordatorioDias, toggleOblSocio, toggleMovSocioTipo, toggleInstancias, setInstFilter, setInstFreq,
+  initSocios, renderSocios, saveSocio, editarSocio, saveMovSocio, editarMovSocio, delMovSocio, abrirRetiroSocio, confirmarRetiroSocio,
   cajRecalc, cajCheckGastos, cajAgregarGasto, cajEliminarGasto, cajGastoChange, cajSetMonto, cajSetDesc,
   cajCheckDepositos, cajAgregarDeposito, cajEliminarDeposito, cajSetMontoDeposito, cajSetDescDeposito, cajDepChange, renderFlujo, abrirAjusteObl, guardarAjusteObl,
   marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
