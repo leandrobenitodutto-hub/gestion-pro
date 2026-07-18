@@ -5180,7 +5180,7 @@ function toggleEstadoMovSocio(id) {
   showToast('✓ Estado actualizado: '+m.estado);
 }
 
-
+function eliminarSocio(id) {
   const s = state.socios.find(x=>x.id===id);
   if (!s) return;
   if (!confirm(`¿Eliminar al socio "${s.nombre}"?\nTambién se eliminarán todos sus movimientos de cuenta corriente.`)) return;
