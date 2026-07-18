@@ -2554,18 +2554,8 @@ function checkMobile() {
 }
 window.addEventListener('resize', checkMobile);
 
-// FAB action — abre el modal relevante según la página activa
+// FAB action — siempre abre el modal de nuevo gasto
 function fabAction() {
-  const activeId = document.querySelector('.page.active')?.id || '';
-  if (activeId === 'page-ingresos')     { openModal('modal-ingreso');     return; }
-  if (activeId === 'page-gastos')       { openModal('modal-gasto');        return; }
-  if (activeId === 'page-cheques')      { openModal('modal-cheque');       return; }
-  if (activeId === 'page-obligaciones') { openModal('modal-obligacion');   return; }
-  if (activeId === 'page-cajas')        { openModal('modal-caja');         return; }
-  if (activeId === 'page-proveedores')  { openModal('modal-proveedor');    return; }
-  if (activeId === 'page-locales')      { openModal('modal-local');        return; }
-  if (activeId === 'page-categorias')   { openModal('modal-categoria');    return; }
-  // Dashboard y cualquier otra página → abrir gasto
   fillSelects();
   document.getElementById('gas-fecha').value = today();
   document.getElementById('gas-id').value = '';
@@ -2583,9 +2573,8 @@ function updateBottomNav(page) {
   const el = document.getElementById(bnavMap[page]);
   if (el) el.classList.add('active');
   else document.getElementById('bnav-menu').classList.add('active');
-  // Mostrar u ocultar FAB según la página
-  const hasFab = ['ingresos','gastos','cheques','obligaciones','cajas','proveedores','locales','categorias','dashboard'];
-  document.getElementById('fab').style.display = hasFab.includes(page) ? 'flex' : 'none';
+  // FAB siempre visible
+  document.getElementById('fab').style.display = 'flex';
 }
 
 
