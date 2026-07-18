@@ -2330,6 +2330,14 @@ async function loadFromFirebase() {
     checkMobile();
     updateBottomNav('dashboard');
     document.getElementById('filter-fecha-caja').value = today();
+    // Si hay socios guardados, pre-renderizar para que estén listos
+    if (state.socios && state.socios.length) {
+      const sociosSel = document.getElementById('filter-socio');
+      if (sociosSel) {
+        sociosSel.innerHTML = '<option value="">— Todos los socios —</option>' +
+          state.socios.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+      }
+    }
   } catch(e) {
     showLoadingOverlay(false);
     console.error('Error cargando datos:', e);
@@ -2596,6 +2604,9 @@ function renderPage(page) {
     clientes: renderClientes,
     locales: renderLocales,
     categorias: renderCategorias,
+    analisis: initAnalisis,
+    reporte: initReporte,
+    socios: initSocios,
   };
   if (fns[page]) fns[page]();
 }
