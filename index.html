@@ -1953,21 +1953,26 @@
     <input type="hidden" id="retiro-socio-id">
     <div id="retiro-socio-info" style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px"></div>
 
-    <!-- Créditos pendientes para imputar -->
-    <div id="retiro-creditos-wrap" style="margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Imputar a crédito pendiente (opcional)</div>
-      <div id="retiro-creditos-lista" style="max-height:180px;overflow-y:auto"></div>
-    </div>
-
     <div class="form-group">
       <label>Fecha del retiro</label>
       <input type="date" id="retiro-socio-fecha">
     </div>
     <div class="form-group">
-      <label>Monto a retirar</label>
-      <input type="number" id="retiro-socio-monto" placeholder="0.00" min="0">
-      <div style="font-size:11px;color:var(--text3);margin-top:4px">Puede ser parcial</div>
+      <label>Monto total del retiro</label>
+      <input type="number" id="retiro-socio-monto" placeholder="0.00" min="0" oninput="recalcularSaldoRetiro()">
     </div>
+
+    <!-- Créditos pendientes para imputar -->
+    <div id="retiro-creditos-wrap" style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:600;color:var(--text2)">Imputar a créditos pendientes</div>
+        <div style="font-size:12px">
+          Saldo por imputar: <span id="retiro-saldo-restante" style="font-weight:700;color:var(--green)">-</span>
+        </div>
+      </div>
+      <div id="retiro-creditos-lista" style="max-height:220px;overflow-y:auto"></div>
+    </div>
+
     <div class="form-group">
       <label>Forma de pago</label>
       <select id="retiro-socio-pago">
@@ -5166,7 +5171,16 @@ function calcSaldoSocio(socioId) {
     }, 0);
 }
 
-function eliminarSocio(id) {
+function toggleEstadoMovSocio(id) {
+  const m = state.cuentaSocios.find(x=>x.id===id);
+  if (!m) return;
+  m.estado = m.estado === 'pagado' ? 'pendiente' : 'pagado';
+  if (m.estado === 'pagado' && !m.fechaPago) m.fechaPago = today();
+  save(); renderSocios();
+  showToast('✓ Estado actualizado: '+m.estado);
+}
+
+
   const s = state.socios.find(x=>x.id===id);
   if (!s) return;
   if (!confirm(`¿Eliminar al socio "${s.nombre}"?\nTambién se eliminarán todos sus movimientos de cuenta corriente.`)) return;
@@ -5255,7 +5269,7 @@ function renderSocios() {
       <td class="hide-mobile">${tagPago(m.pago)}</td>
       <td class="mono" style="color:var(--green);font-weight:600">${esCred?fmt(m.monto):''}</td>
       <td class="mono" style="color:var(--red);font-weight:600">${!esCred?fmt(m.monto):''}</td>
-      <td><span class="badge" style="color:${m.estado==='pagado'?'var(--green)':'var(--orange)'}">${m.estado==='pagado'?'Pagado':'Pendiente'}</span></td>
+      <td><span class="badge" style="cursor:pointer;color:${m.estado==='pagado'?'var(--green)':'var(--orange)'}" onclick="toggleEstadoMovSocio('${m.id}')" title="Click para cambiar estado">${m.estado==='pagado'?'✓ Pagado':'⏳ Pendiente'}</span></td>
       <td style="display:flex;gap:4px">
         <button class="btn btn-icon btn-sm" onclick="editarMovSocio('${m.id}')">✏</button>
         <button class="btn btn-icon btn-sm" onclick="delMovSocio('${m.id}')">🗑</button>
@@ -5400,7 +5414,7 @@ function abrirRetiroSocio(socioId) {
           </div>
           <input type="number" data-imp="${c.id}" placeholder="0" min="0" max="${c.monto}" value=""
             disabled
-            oninput="recalcularTotalRetiro()"
+            oninput="recalcularSaldoRetiro()"
             style="width:90px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 8px;font-size:13px;font-family:monospace;opacity:0.4">
         </div>`).join('');
     }
@@ -5412,29 +5426,58 @@ function abrirRetiroSocio(socioId) {
   openModal('modal-retiro-socio');
 }
 
+function recalcularSaldoRetiro() {
+  // Actualizar el saldo restante a medida que el usuario escribe el monto total
+  const total = parseFloat(document.getElementById('retiro-socio-monto')?.value||0);
+  const yaImputado = calcTotalImputado();
+  const restante = total - yaImputado;
+  const el = document.getElementById('retiro-saldo-restante');
+  if (el) {
+    el.textContent = fmt(Math.max(restante, 0));
+    el.style.color = restante < 0 ? 'var(--red)' : restante === 0 ? 'var(--green)' : 'var(--accent)';
+  }
+  // Actualizar max de cada input habilitado
+  document.querySelectorAll('#retiro-creditos-lista input[type=number]:not([disabled])').forEach(inp=>{
+    const cid = inp.dataset.imp;
+    const cred = state.cuentaSocios.find(x=>x.id===cid);
+    if (cred) inp.max = cred.monto;
+  });
+}
+
+function calcTotalImputado() {
+  let total = 0;
+  document.querySelectorAll('#retiro-creditos-lista input[type=number]:not([disabled])').forEach(inp=>{
+    total += parseFloat(inp.value||0);
+  });
+  return total;
+}
+
 function toggleImputacion(chk) {
   const cid = chk.dataset.cid;
   const montoOriginal = parseFloat(chk.dataset.monto||0);
   const input = document.querySelector(`input[data-imp="${cid}"]`);
   if (!input) return;
+
+  const montoTotal = parseFloat(document.getElementById('retiro-socio-monto')?.value||0);
+  const yaImputado = calcTotalImputado();
+
   if (chk.checked) {
     input.disabled = false;
     input.style.opacity = '1';
-    input.value = montoOriginal; // pre-llenar con monto completo
+    // Sugerir el mínimo entre el saldo restante y el crédito completo
+    const restante = montoTotal - yaImputado;
+    const sugerido = Math.min(montoOriginal, Math.max(restante, 0));
+    input.value = sugerido > 0 ? sugerido : montoOriginal;
   } else {
     input.disabled = true;
     input.style.opacity = '0.4';
     input.value = '';
   }
-  recalcularTotalRetiro();
+  recalcularSaldoRetiro();
 }
 
 function recalcularTotalRetiro() {
-  let total = 0;
-  document.querySelectorAll('#retiro-creditos-lista input[type=number]:not([disabled])').forEach(inp=>{
-    total += parseFloat(inp.value||0);
-  });
-  if (total > 0) document.getElementById('retiro-socio-monto').value = total;
+  recalcularSaldoRetiro();
 }
 
 function confirmarRetiroSocio() {
@@ -6727,7 +6770,9 @@ Object.assign(window, {
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv, agregarProvRapido,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
   autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleRecordatorioDias, toggleOblSocio, toggleMovSocioTipo, toggleInstancias, setInstFilter, setInstFreq,
-  initSocios, renderSocios, saveSocio, editarSocio, eliminarSocio, saveMovSocio, editarMovSocio, delMovSocio, abrirRetiroSocio, toggleImputacion, recalcularTotalRetiro, confirmarRetiroSocio, toggleOblSocio, toggleMovSocioTipo,
+  initSocios, renderSocios, saveSocio, editarSocio, eliminarSocio, saveMovSocio, editarMovSocio, delMovSocio,
+  abrirRetiroSocio, toggleImputacion, recalcularSaldoRetiro, recalcularTotalRetiro, confirmarRetiroSocio,
+  toggleEstadoMovSocio, toggleOblSocio, toggleMovSocioTipo,
   cajRecalc, cajCheckGastos, cajAgregarGasto, cajEliminarGasto, cajGastoChange, cajSetMonto, cajSetDesc,
   cajCheckDepositos, cajAgregarDeposito, cajEliminarDeposito, cajSetMontoDeposito, cajSetDescDeposito, cajDepChange, renderFlujo, abrirAjusteObl, guardarAjusteObl,
   marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
