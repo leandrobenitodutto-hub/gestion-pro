@@ -5526,10 +5526,12 @@ function confirmarRetiroSocio() {
         concepto: cred.concepto,
         monto: saldoRestante,
         pago: cred.pago,
-        desc: (cred.desc||'')+' (saldo pendiente)',
+        desc: (cred.desc||'').replace(' (a cuenta)','') + ' (saldo pendiente)',
         estado: 'pendiente',
         _oblInstanciaId: cred._oblInstanciaId,
       });
+      // Actualizar descripción del crédito parcialmente pagado
+      cred.desc = (cred.desc||'').replace(' (saldo pendiente)','').replace(' (a cuenta)','') + ' (a cuenta)';
       imputados.push({desc: CONCEPTO_LABELS[cred.concepto]||cred.concepto, monto: montoImp, parcial: true, saldo: saldoRestante});
     }
   });
