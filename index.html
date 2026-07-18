@@ -5148,14 +5148,25 @@ function calcSaldoSocio(socioId) {
     }, 0);
 }
 
+function eliminarSocio(id) {
+  const s = state.socios.find(x=>x.id===id);
+  if (!s) return;
+  if (!confirm(`¿Eliminar al socio "${s.nombre}"?\nTambién se eliminarán todos sus movimientos de cuenta corriente.`)) return;
+  state.socios = state.socios.filter(x=>x.id!==id);
+  state.cuentaSocios = state.cuentaSocios.filter(m=>m.socioId!==id);
+  save(); renderSocios();
+  showToast('✓ Socio eliminado');
+}
+
 function initSocios() {
-  // Filtro por socio
+  // Siempre llenar el filtro de socios con los datos actuales
   const sel = document.getElementById('filter-socio');
   if (sel) {
+    const cur = sel.value;
     sel.innerHTML = '<option value="">— Todos los socios —</option>' +
-      state.socios.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+      state.socios.map(s=>`<option value="${s.id}"${s.id===cur?' selected':''}>${s.nombre}</option>`).join('');
   }
-  // Mes default
+  // Mes default si está vacío
   const mes = document.getElementById('filter-mes-socio');
   if (mes && !mes.value) mes.value = thisMonth();
   renderSocios();
@@ -5170,13 +5181,19 @@ function renderSocios() {
     } else {
       cards.innerHTML = state.socios.map(s=>{
         const saldo = calcSaldoSocio(s.id);
-        const color = saldo >= 0 ? 'var(--red)' : 'var(--green)'; // rojo = empresa debe; verde = socio debe
+        const color = saldo >= 0 ? 'var(--red)' : 'var(--green)';
         const label = saldo >= 0 ? 'Empresa le debe' : 'Socio debe';
         return `<div class="stat-card" style="border-left:3px solid ${s.color||'var(--accent)'}">
-          <div class="stat-label">${s.nombre}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div class="stat-label" style="margin:0">${s.nombre}</div>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-icon btn-sm" onclick="editarSocio('${s.id}')" title="Editar">✏</button>
+              <button class="btn btn-icon btn-sm" onclick="eliminarSocio('${s.id}')" title="Eliminar" style="color:var(--red)">🗑</button>
+            </div>
+          </div>
           <div class="stat-value" style="color:${color};font-size:20px">${fmt(Math.abs(saldo))}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:4px">${label}</div>
-          <button class="btn btn-secondary" style="margin-top:8px;font-size:11px;padding:4px 10px" onclick="abrirRetiroSocio('${s.id}')">💸 Registrar retiro</button>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px;margin-bottom:8px">${label}</div>
+          <button class="btn btn-secondary" style="font-size:11px;padding:5px 10px;width:100%" onclick="abrirRetiroSocio('${s.id}')">💸 Registrar retiro</button>
         </div>`;
       }).join('');
     }
@@ -6590,7 +6607,7 @@ Object.assign(window, {
   onGasProvSearch, showProvDropdown, hideProvDropdown, selectGasProv, agregarProvRapido,
   onOblProvSearch, showOblProvDropdown, hideOblProvDropdown, selectOblProv,
   autocompletarDesdeCliente, fillSubcat, fillOblSubcat, fillProvSubcat, fillCliSubcat, toggleOblDia, toggleRecordatorioDias, toggleOblSocio, toggleMovSocioTipo, toggleInstancias, setInstFilter, setInstFreq,
-  initSocios, renderSocios, saveSocio, editarSocio, saveMovSocio, editarMovSocio, delMovSocio, abrirRetiroSocio, confirmarRetiroSocio,
+  initSocios, renderSocios, saveSocio, editarSocio, eliminarSocio, saveMovSocio, editarMovSocio, delMovSocio, abrirRetiroSocio, confirmarRetiroSocio,
   cajRecalc, cajCheckGastos, cajAgregarGasto, cajEliminarGasto, cajGastoChange, cajSetMonto, cajSetDesc,
   cajCheckDepositos, cajAgregarDeposito, cajEliminarDeposito, cajSetMontoDeposito, cajSetDescDeposito, cajDepChange, renderFlujo, abrirAjusteObl, guardarAjusteObl,
   marcarCobrado, desmarcarCobrado, autocompletarDesdeProv_Cheque, fillChqSubcat,
