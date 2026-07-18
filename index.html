@@ -5245,7 +5245,11 @@ function renderSocios() {
   if (textoFil)  movs = movs.filter(m=>(m.desc||'').toLowerCase().includes(textoFil)||
     getSocioNombre(m.socioId).toLowerCase().includes(textoFil));
 
-  movs.sort((a,b)=>b.fecha>a.fecha?1:-1);
+  movs.sort((a,b)=>{
+    if (b.fecha !== a.fecha) return b.fecha > a.fecha ? 1 : -1;
+    if (a.tipo !== b.tipo) return a.tipo === 'credito' ? -1 : 1;
+    return 0;
+  });
 
   const tbody = document.getElementById('tabla-socios');
   if (!tbody) return;
@@ -5317,32 +5321,35 @@ function saveMovSocio() {
   if (!socioId) return alert('Seleccioná un socio');
   if (!monto)   return alert('Ingresá el monto');
 
-  const data = {fecha, socioId, tipo, concepto, monto, pago, desc, estado:'pagado'};
-
-  // Si es débito (retiro/devolución) → genera gasto automático
-  if (tipo === 'debito' && !editId) {
-    const socio = state.socios.find(s=>s.id===socioId);
-    const gastoId = uid();
-    state.gastos.push({
-      id: gastoId,
-      fecha, monto, pago,
-      cat: 'Retiro Socios',
-      subcat: socio?.nombre||'',
-      desc: desc||'Retiro '+( socio?.nombre||'socio'),
-      localId: null,
-    });
-    data._gastoId = gastoId;
-  }
-
-  // Si es crédito (empresa genera deuda) → queda pendiente hasta que el socio retire
-  if (tipo === 'credito') {
-    data.estado = 'pendiente';
-  }
-
   if (editId) {
+    // EDITAR — solo actualizar los campos, preservar estado y referencias
     const o = state.cuentaSocios.find(x=>x.id===editId);
-    if (o) Object.assign(o, data);
+    if (o) {
+      o.fecha = fecha; o.socioId = socioId; o.tipo = tipo;
+      o.concepto = concepto; o.monto = monto; o.pago = pago; o.desc = desc;
+      // Actualizar gasto vinculado si es débito
+      if (tipo === 'debito' && o._gastoId) {
+        const g = state.gastos.find(x=>x.id===o._gastoId);
+        if (g) { g.fecha=fecha; g.monto=monto; g.pago=pago; g.desc=desc; }
+      }
+    }
   } else {
+    // NUEVO movimiento
+    const data = {fecha, socioId, tipo, concepto, monto, pago, desc};
+    data.estado = tipo === 'credito' ? 'pendiente' : 'pagado';
+
+    if (tipo === 'debito') {
+      const socio = state.socios.find(s=>s.id===socioId);
+      const gastoId = uid();
+      state.gastos.push({
+        id: gastoId, fecha, monto, pago,
+        cat: 'Retiro Socios',
+        subcat: socio?.nombre||'',
+        desc: desc||'Retiro '+(socio?.nombre||'socio'),
+        localId: null,
+      });
+      data._gastoId = gastoId;
+    }
     state.cuentaSocios.push({id:uid(), ...data});
   }
 
