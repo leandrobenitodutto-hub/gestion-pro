@@ -1024,6 +1024,11 @@
             Nuevo Proveedor
           </button>
         </div>
+        <div style="margin-bottom:12px">
+          <input type="text" id="search-proveedores" placeholder="🔍 Buscar por nombre, rubro, categoría..."
+            oninput="renderProveedores()"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 14px;font-size:13px;box-sizing:border-box">
+        </div>
         <div class="card">
           <div class="table-wrap">
             <table>
@@ -1899,7 +1904,9 @@
       </div>
       <div class="form-group">
         <label>Socio</label>
-        <select id="mov-socio-socio"></select>
+        <select id="mov-socio-socio">
+          <option value="todos">👥 Todos los socios</option>
+        </select>
       </div>
       <div class="form-group">
         <label>Tipo</label>
@@ -4539,9 +4546,20 @@ function calcSaldoProv(id) {
 
 function renderProveedores() {
   const tbody = document.getElementById('tabla-proveedores');
-  if (state.proveedores.length === 0) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">👥</div><p>Sin proveedores</p></div></td></tr>`; return; }
-  const sorted = [...state.proveedores].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
-  tbody.innerHTML = sorted.map(p=>`<tr>
+  const q = (document.getElementById('search-proveedores')?.value||'').toLowerCase().trim();
+  let lista = [...state.proveedores].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  if (q) lista = lista.filter(p=>
+    (p.nombre||'').toLowerCase().includes(q) ||
+    (p.rubro||'').toLowerCase().includes(q) ||
+    (p.cat||'').toLowerCase().includes(q) ||
+    (p.contacto||'').toLowerCase().includes(q) ||
+    (p.cuit||'').toLowerCase().includes(q)
+  );
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">👥</div><p>${q?'Sin resultados para "'+q+'"':'Sin proveedores'}</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = lista.map(p=>`<tr>
     <td style="font-weight:600">${p.nombre}</td>
     <td class="mono hide-mobile" style="font-size:12px">${p.cuit||'-'}</td>
     <td class="hide-mobile"><span class="badge badge-gray">${p.rubro||'-'}</span></td>
@@ -5321,36 +5339,39 @@ function saveMovSocio() {
   if (!socioId) return alert('Seleccioná un socio');
   if (!monto)   return alert('Ingresá el monto');
 
+  // Determinar lista de socios a afectar
+  const sociosIds = socioId === 'todos'
+    ? state.socios.map(s=>s.id)
+    : [socioId];
+
   if (editId) {
-    // EDITAR — solo actualizar los campos, preservar estado y referencias
+    // EDITAR — solo actualiza el movimiento existente (no replica a todos)
     const o = state.cuentaSocios.find(x=>x.id===editId);
     if (o) {
-      o.fecha = fecha; o.socioId = socioId; o.tipo = tipo;
-      o.concepto = concepto; o.monto = monto; o.pago = pago; o.desc = desc;
-      // Actualizar gasto vinculado si es débito
-      if (tipo === 'debito' && o._gastoId) {
+      o.fecha=fecha; o.socioId=o.socioId; o.tipo=tipo;
+      o.concepto=concepto; o.monto=monto; o.pago=pago; o.desc=desc;
+      if (tipo==='debito' && o._gastoId) {
         const g = state.gastos.find(x=>x.id===o._gastoId);
         if (g) { g.fecha=fecha; g.monto=monto; g.pago=pago; g.desc=desc; }
       }
     }
   } else {
-    // NUEVO movimiento
-    const data = {fecha, socioId, tipo, concepto, monto, pago, desc};
-    data.estado = tipo === 'credito' ? 'pendiente' : 'pagado';
-
-    if (tipo === 'debito') {
-      const socio = state.socios.find(s=>s.id===socioId);
-      const gastoId = uid();
-      state.gastos.push({
-        id: gastoId, fecha, monto, pago,
-        cat: 'Retiro Socios',
-        subcat: socio?.nombre||'',
-        desc: desc||'Retiro '+(socio?.nombre||'socio'),
-        localId: null,
-      });
-      data._gastoId = gastoId;
-    }
-    state.cuentaSocios.push({id:uid(), ...data});
+    // NUEVO — generar un movimiento por cada socio seleccionado
+    sociosIds.forEach(sid=>{
+      const socio = state.socios.find(s=>s.id===sid);
+      const data = {fecha, socioId:sid, tipo, concepto, monto, pago, desc};
+      data.estado = tipo==='credito' ? 'pendiente' : 'pagado';
+      if (tipo==='debito') {
+        const gastoId = uid();
+        state.gastos.push({
+          id:gastoId, fecha, monto, pago,
+          cat:'Retiro Socios', subcat:socio?.nombre||'',
+          desc:desc||'Retiro '+(socio?.nombre||'socio'), localId:null,
+        });
+        data._gastoId = gastoId;
+      }
+      state.cuentaSocios.push({id:uid(), ...data});
+    });
   }
 
   save(); closeModal('modal-mov-socio'); renderSocios(); updateTopbar();
@@ -5362,7 +5383,8 @@ function editarMovSocio(id) {
   if (!m) return;
   // Llenar select socios
   const sel = document.getElementById('mov-socio-socio');
-  sel.innerHTML = state.socios.map(s=>`<option value="${s.id}"${s.id===m.socioId?' selected':''}>${s.nombre}</option>`).join('');
+  sel.innerHTML = '<option value="todos">👥 Todos los socios</option>' +
+    state.socios.map(s=>`<option value="${s.id}"${s.id===m.socioId?' selected':''}>${s.nombre}</option>`).join('');
   document.getElementById('mov-socio-id').value      = id;
   document.getElementById('mov-socio-fecha').value   = m.fecha||'';
   document.getElementById('mov-socio-tipo').value    = m.tipo||'credito';
@@ -5829,7 +5851,8 @@ function openModal(id) {
     document.getElementById('mov-socio-monto').value = '';
     document.getElementById('mov-socio-desc').value  = '';
     const sel = document.getElementById('mov-socio-socio');
-    if (sel) sel.innerHTML = state.socios.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
+    if (sel) sel.innerHTML = '<option value="todos">👥 Todos los socios</option>' +
+      state.socios.map(s=>`<option value="${s.id}">${s.nombre}</option>`).join('');
   }
   if (id === 'modal-local') {
     document.getElementById('loc-id').value='';
