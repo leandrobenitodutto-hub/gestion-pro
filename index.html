@@ -6062,7 +6062,8 @@ function openModal(id) {
     document.getElementById('loc-id').value='';
     document.getElementById('loc-modal-title').textContent='Nuevo Local';
     ['loc-nombre','loc-dir'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=''; });
-    const locTipo = document.getElementById('loc-tipo'); if(locTipo) locTipo.value='pancheria';
+    const locTipo = document.getElementById('loc-tipo');
+    if (locTipo) { locTipo.value='pancheria'; locTipo.selectedIndex=0; }
     const locColor = document.getElementById('loc-color'); if(locColor) locColor.value='#f0c040';
     const cd=document.getElementById('loc-caja-diaria'); if(cd) cd.checked=true;
   }
@@ -6911,9 +6912,10 @@ function saveProveedor() {
 
 function saveLocal() {
   const editId = document.getElementById('loc-id').value;
+  const tipoEl = document.getElementById('loc-tipo');
   const data = {
     nombre: document.getElementById('loc-nombre').value,
-    tipo:   document.getElementById('loc-tipo').value,
+    tipo:   tipoEl ? tipoEl.options[tipoEl.selectedIndex].value : 'pancheria',
     color:  document.getElementById('loc-color').value,
     dir:    document.getElementById('loc-dir').value,
     cajaDiaria: document.getElementById('loc-caja-diaria')?.checked !== false,
