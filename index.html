@@ -3995,7 +3995,7 @@ function renderCajas() {
       const diasCargados = cajasLoc.length;
       const pct = totalMes > 0 ? Math.round(totalLoc/totalMes*100) : 0;
       resHtml += `<div class="card-sm" style="border-left:3px solid ${loc.color||'var(--accent)'}">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">${loc.tipo==='pancheria'?'🌭':'🍦'} ${loc.nombre}</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">${loc.tipo==='pancheria'?'🌭':loc.tipo==='heladeria'?'🍦':'📦'} ${loc.nombre}</div>
         <div class="mono" style="font-size:20px;font-weight:700;margin-bottom:4px;color:var(--green)">${fmt(totalLoc)}</div>
         <div style="background:var(--border);border-radius:3px;height:4px;margin-bottom:4px">
           <div style="background:${loc.color||'var(--accent)'};height:4px;border-radius:3px;width:${pct}%"></div>
@@ -5846,7 +5846,7 @@ function renderLocales() {
   }
   grid.innerHTML = state.locales.map(l=>`
     <div class="card" style="border-left:4px solid ${l.color||'var(--accent)'}">
-      <div style="font-size:24px;margin-bottom:8px">${l.tipo==='pancheria'?'🌭':'🍦'}</div>
+      <div style="font-size:24px;margin-bottom:8px">${l.tipo==='pancheria'?'🌭':l.tipo==='heladeria'?'🍦':'📦'}</div>
       <div style="font-size:16px;font-weight:700;margin-bottom:4px">${l.nombre}</div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:8px">${l.dir||''}</div>
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -6242,7 +6242,7 @@ function fillSelects() {
   const localOpts = `<option value="">— Todos los locales —</option>` + state.locales.map(l=>`<option value="${l.id}">${l.nombre}</option>`).join('');
   const localOptsCaja = state.locales.length === 0
     ? `<option value="">— Sin locales cargados —</option>`
-    : state.locales.map(l=>`<option value="${l.id}">${l.tipo==='pancheria'?'🌭':'🍦'} ${l.nombre}</option>`).join('');
+    : state.locales.map(l=>`<option value="${l.id}">${l.tipo==='pancheria'?'🌭':l.tipo==='heladeria'?'🍦':'📦'} ${l.nombre}</option>`).join('');
   const provOpts = `<option value="">— Sin proveedor —</option>` +
     [...state.proveedores].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
     .map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
@@ -6921,7 +6921,6 @@ function saveLocal() {
   const editId = document.getElementById('loc-id').value;
   const tipoEl = document.querySelector('input[name="loc-tipo"]:checked');
   const tipoVal = tipoEl ? tipoEl.value : 'pancheria';
-  alert('DEBUG tipo: ' + tipoVal + ' | checked: ' + (tipoEl ? tipoEl.value : 'ninguno'));
   const data = {
     nombre: document.getElementById('loc-nombre').value,
     tipo:   tipoVal,
