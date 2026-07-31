@@ -6920,9 +6920,11 @@ function saveProveedor() {
 function saveLocal() {
   const editId = document.getElementById('loc-id').value;
   const tipoEl = document.querySelector('input[name="loc-tipo"]:checked');
+  const tipoVal = tipoEl ? tipoEl.value : 'pancheria';
+  alert('DEBUG tipo: ' + tipoVal + ' | checked: ' + (tipoEl ? tipoEl.value : 'ninguno'));
   const data = {
     nombre: document.getElementById('loc-nombre').value,
-    tipo:   tipoEl ? tipoEl.value : 'pancheria',
+    tipo:   tipoVal,
     color:  document.getElementById('loc-color').value,
     dir:    document.getElementById('loc-dir').value,
     cajaDiaria: document.getElementById('loc-caja-diaria')?.checked !== false,
