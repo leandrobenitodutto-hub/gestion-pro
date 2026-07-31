@@ -2135,13 +2135,19 @@
         <label>Nombre del Local</label>
         <input type="text" id="loc-nombre" placeholder="Ej: Panchería Centro">
       </div>
-      <div class="form-group">
+      <div class="form-group full">
         <label>Tipo</label>
-        <select id="loc-tipo">
-          <option value="pancheria">🌭 Panchería</option>
-          <option value="heladeria">🍦 Heladería</option>
-          <option value="otro">📦 Otro</option>
-        </select>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2)">
+            <input type="radio" name="loc-tipo" id="loc-tipo" value="pancheria" checked style="width:auto;margin:0"> 🌭 Panchería
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2)">
+            <input type="radio" name="loc-tipo" value="heladeria" style="width:auto;margin:0"> 🍦 Heladería
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2)">
+            <input type="radio" name="loc-tipo" value="otro" style="width:auto;margin:0"> 📦 Otro
+          </label>
+        </div>
       </div>
       <div class="form-group">
         <label>Color</label>
@@ -6062,8 +6068,8 @@ function openModal(id) {
     document.getElementById('loc-id').value='';
     document.getElementById('loc-modal-title').textContent='Nuevo Local';
     ['loc-nombre','loc-dir'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=''; });
-    const locTipo = document.getElementById('loc-tipo');
-    if (locTipo) { locTipo.value='pancheria'; locTipo.selectedIndex=0; }
+    const locTipo = document.querySelector('input[name="loc-tipo"][value="pancheria"]');
+    if (locTipo) locTipo.checked = true;
     const locColor = document.getElementById('loc-color'); if(locColor) locColor.value='#f0c040';
     const cd=document.getElementById('loc-caja-diaria'); if(cd) cd.checked=true;
   }
@@ -6219,7 +6225,8 @@ function editarLocal(id) {
   document.getElementById('loc-id').value         = id;
   document.getElementById('loc-modal-title').textContent = 'Editar Local';
   document.getElementById('loc-nombre').value     = l.nombre||'';
-  document.getElementById('loc-tipo').value       = l.tipo||'pancheria';
+  const tipoRadio = document.querySelector(`input[name="loc-tipo"][value="${l.tipo||'pancheria'}"]`);
+  if (tipoRadio) tipoRadio.checked = true;
   document.getElementById('loc-color').value      = l.color||'#f0c040';
   document.getElementById('loc-dir').value        = l.dir||'';
   const cd = document.getElementById('loc-caja-diaria');
@@ -6912,10 +6919,10 @@ function saveProveedor() {
 
 function saveLocal() {
   const editId = document.getElementById('loc-id').value;
-  const tipoEl = document.getElementById('loc-tipo');
+  const tipoEl = document.querySelector('input[name="loc-tipo"]:checked');
   const data = {
     nombre: document.getElementById('loc-nombre').value,
-    tipo:   tipoEl ? tipoEl.options[tipoEl.selectedIndex].value : 'pancheria',
+    tipo:   tipoEl ? tipoEl.value : 'pancheria',
     color:  document.getElementById('loc-color').value,
     dir:    document.getElementById('loc-dir').value,
     cajaDiaria: document.getElementById('loc-caja-diaria')?.checked !== false,
