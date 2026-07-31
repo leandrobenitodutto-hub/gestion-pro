@@ -6062,6 +6062,8 @@ function openModal(id) {
     document.getElementById('loc-id').value='';
     document.getElementById('loc-modal-title').textContent='Nuevo Local';
     ['loc-nombre','loc-dir'].forEach(fid=>{ const el=document.getElementById(fid); if(el) el.value=''; });
+    const locTipo = document.getElementById('loc-tipo'); if(locTipo) locTipo.value='pancheria';
+    const locColor = document.getElementById('loc-color'); if(locColor) locColor.value='#f0c040';
     const cd=document.getElementById('loc-caja-diaria'); if(cd) cd.checked=true;
   }
   document.getElementById(id).style.display='flex';
