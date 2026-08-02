@@ -1328,7 +1328,10 @@
               <option value="devolucion">Devolución socio</option>
               <option value="otro">Otro</option>
             </select>
-            <input type="month" id="filter-mes-socio" onchange="renderSocios()" style="width:auto">
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="month" id="filter-mes-socio" onchange="renderSocios()" style="width:auto">
+              <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px" onclick="document.getElementById('filter-mes-socio').value='';renderSocios()">✕ Todos</button>
+            </div>
             <input type="text" id="filter-texto-socio" placeholder="🔍 Buscar..." oninput="renderSocios()"
               style="flex:1;min-width:160px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 12px;font-size:13px">
           </div>
@@ -1336,7 +1339,7 @@
 
         <!-- Tabla movimientos -->
         <div class="card">
-          <div class="table-wrap">
+          <div class="table-wrap" style="max-height:500px;overflow-y:auto">
             <table>
               <thead>
                 <tr>
@@ -5421,17 +5424,14 @@ function eliminarSocio(id) {
 }
 
 function initSocios() {
-  // Siempre reconstruir el select con los socios actuales
   const sel = document.getElementById('filter-socio');
   if (sel) {
     const cur = sel.value;
     sel.innerHTML = '<option value="">— Todos los socios —</option>' +
       state.socios.map(s=>`<option value="${s.id}"${s.id===cur?' selected':''}>${s.nombre}</option>`).join('');
-    // Si el socio seleccionado ya no existe, resetear
     if (cur && !state.socios.find(s=>s.id===cur)) sel.value = '';
   }
-  const mes = document.getElementById('filter-mes-socio');
-  if (mes && !mes.value) mes.value = thisMonth();
+  // No setear mes por defecto — mostrar historial completo
   renderSocios();
 }
 
