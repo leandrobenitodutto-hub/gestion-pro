@@ -2423,10 +2423,12 @@ function save(skipSnapshot) {
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(async () => {
     try {
-      await setDoc(DOC_REF, state);
+      // Limpiar undefined de todo el state antes de guardar
+      const stateClean = JSON.parse(JSON.stringify(state));
+      await setDoc(DOC_REF, stateClean);
     } catch(e) {
       console.error('Error guardando:', e);
-      showToast('⚠ Error al guardar. Verificá tu conexión.');
+      showToast('⚠ Error al guardar: ' + (e.message||e));
     }
   }, 0);
 }
@@ -5587,6 +5589,7 @@ function saveMovSocio() {
   save(); closeModal('modal-mov-socio'); renderSocios(); updateTopbar();
   showToast('✓ Movimiento guardado');
 }
+}
 
 function editarMovSocio(id) {
   const m = state.cuentaSocios.find(x=>x.id===id);
@@ -5799,6 +5802,13 @@ function confirmarRetiroSocio() {
     _imputaCreditos: imputados.map(i=>i.desc),
   });
 
+  // Limpiar undefined antes de guardar (Firestore rechaza undefined)
+  state.cuentaSocios = state.cuentaSocios.map(m => {
+    const clean = {};
+    Object.keys(m).forEach(k => { if (m[k] !== undefined) clean[k] = m[k]; });
+    return clean;
+  });
+
   save(); closeModal('modal-retiro-socio'); renderSocios(); updateTopbar();
   const parciales = imputados.filter(i=>i.parcial);
   let msg = '✓ Retiro registrado';
@@ -5806,7 +5816,6 @@ function confirmarRetiroSocio() {
   if (parciales.length) msg += `, ${parciales.length} parcial(es)`;
   showToast(msg);
 }
-
 // Vinculación automática desde obligaciones
 // Cuando se paga una instancia de obligación vinculada a un socio,
 // se genera automáticamente el crédito en la cuenta del socio.
